@@ -1,0 +1,57 @@
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Docker volumes
+elasticsearch-data/
+
+# Evidence and incident files
+evidence_*/
+incident_*/
+attack_*.txt
+*.json.bak
+
+# Analysis outputs
+attack_analysis_report.txt
+attack_findings.json
+attack_timeline.txt
+data_exfil.txt
+hashes.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Sensitive files (if accidentally created)
+*.key
+*.pem
+cookies.txt
+tokens.txt

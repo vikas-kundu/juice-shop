@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # OWASP Juice Shop - Vulnerable Application
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: juice-shop
+    ports:
+      - "8000:3000"
+    environment:
+      - NODE_ENV=development
+    networks:
+      - juiceshop-network
+    restart: unless-stopped
+
+  # ELK Stack for Blue Team Monitoring
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - juiceshop-network
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - juiceshop-network
+    restart: unless-stopped
+
+  # Filebeat for log collection
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: filebeat
+    user: root
+    volumes:
+      - ./blue-team/config/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - elasticsearch
+    networks:
+      - juiceshop-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy with logging
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    ports:
+      - "8080:80"
+    volumes:
+      - ./blue-team/config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - juice-shop
+    networks:
+      - juiceshop-network
+    restart: unless-stopped
+
+  # Red Team Attack Box
+  kali-attack:
+    build:
+      context: ./red-team
+      dockerfile: Dockerfile
+    container_name: kali-attack
+    stdin_open: true
+    tty: true
+    networks:
+      - juiceshop-network
+    restart: unless-stopped
+
+networks:
+  juiceshop-network:
+    driver: bridge
+
+volumes:
+  elasticsearch-data:
