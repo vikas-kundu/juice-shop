@@ -72,18 +72,6 @@ services:
       - juiceshop-network
     restart: unless-stopped
 
-  # Red Team Attack Box
-  kali-attack:
-    build:
-      context: ./red-team
-      dockerfile: Dockerfile
-    container_name: kali-attack
-    stdin_open: true
-    tty: true
-    networks:
-      - juiceshop-network
-    restart: unless-stopped
-
 networks:
   juiceshop-network:
     driver: bridge

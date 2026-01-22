@@ -108,7 +108,7 @@ curl -I http://localhost:8080
 # X-XSS-Protection: 1; mode=block
 
 # Check direct Juice Shop headers
-curl -I http://localhost:3000
+curl -I http://localhost:8000
 ```
 
 ### Security Header Assessment:

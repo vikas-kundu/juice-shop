@@ -10,8 +10,8 @@ Perform initial reconnaissance on the Juice Shop application to discover attack 
 
 ## Prerequisites
 
-- Access to the Kali attack box or your local machine
-- Target URL: `http://juice-shop:3000` (from container) or `http://localhost:3000` (from host)
+- Kali Linux or your preferred security testing environment
+- Target URL: `http://<TARGET_IP>:8000` (replace with VPS IP address)
 
 ---
 

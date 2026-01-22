@@ -6,13 +6,13 @@
 
 ```bash
 # Check HTTP headers
-curl -I http://localhost:3000
+curl -I http://localhost:8000
 
 # Detailed header analysis
-curl -v http://localhost:3000 2>&1 | grep -E "^< "
+curl -v http://localhost:8000 2>&1 | grep -E "^< "
 
 # Check for technology indicators
-curl -s http://localhost:3000 | grep -E "(angular|react|vue|express)"
+curl -s http://localhost:8000 | grep -E "(angular|react|vue|express)"
 ```
 
 ### Answers:
@@ -24,7 +24,7 @@ curl -s http://localhost:3000 | grep -E "(angular|react|vue|express)"
 
 2. **Server Technology:**
    - Express.js (visible in `X-Powered-By: Express` header)
-   - To see: `curl -I http://localhost:3000 | grep "X-Powered-By"`
+   - To see: `curl -I http://localhost:8000 | grep "X-Powered-By"`
 
 3. **Exposed Version Numbers:**
    - Check `/package.json` or `/main.js` for version info
@@ -38,28 +38,28 @@ curl -s http://localhost:3000 | grep -E "(angular|react|vue|express)"
 
 ```bash
 # Using gobuster
-gobuster dir -u http://localhost:3000 -w /usr/share/wordlists/dirb/common.txt
+gobuster dir -u http://localhost:8000 -w /usr/share/wordlists/dirb/common.txt
 
 # Using dirb
-dirb http://localhost:3000 /usr/share/wordlists/dirb/common.txt
+dirb http://localhost:8000 /usr/share/wordlists/dirb/common.txt
 
 # Manual checks
-curl -s http://localhost:3000/api
-curl -s http://localhost:3000/ftp
-curl -s http://localhost:3000/api-docs
-curl -s http://localhost:3000/swagger.json
-curl -s http://localhost:3000/robots.txt
+curl -s http://localhost:8000/api
+curl -s http://localhost:8000/ftp
+curl -s http://localhost:8000/api-docs
+curl -s http://localhost:8000/swagger.json
+curl -s http://localhost:8000/robots.txt
 ```
 
 ### Hidden Endpoints Found:
 
 1. **`/ftp`** - Directory listing with downloadable files
    - Contains backup files and confidential documents
-   - Access: `http://localhost:3000/ftp`
+   - Access: `http://localhost:8000/ftp`
 
 2. **`/api-docs`** - Swagger API documentation
    - Full API specification
-   - Access: `http://localhost:3000/api-docs`
+   - Access: `http://localhost:8000/api-docs`
 
 3. **`/rest/admin/application-version`** - Version disclosure
    - Exposes exact application version
@@ -80,16 +80,16 @@ curl -s http://localhost:3000/robots.txt
 
 ```bash
 # Download and analyze main JavaScript
-curl -s http://localhost:3000/main.js | head -5000 > main_analysis.js
+curl -s http://localhost:8000/main.js | head -5000 > main_analysis.js
 
 # Search for interesting strings
-curl -s http://localhost:3000/main.js | grep -oE '"[^"]*admin[^"]*"'
-curl -s http://localhost:3000/main.js | grep -oE '"[^"]*password[^"]*"'
-curl -s http://localhost:3000/main.js | grep -oE '"[^"]*secret[^"]*"'
-curl -s http://localhost:3000/main.js | grep -oE '/api/[^"]*'
+curl -s http://localhost:8000/main.js | grep -oE '"[^"]*admin[^"]*"'
+curl -s http://localhost:8000/main.js | grep -oE '"[^"]*password[^"]*"'
+curl -s http://localhost:8000/main.js | grep -oE '"[^"]*secret[^"]*"'
+curl -s http://localhost:8000/main.js | grep -oE '/api/[^"]*'
 
 # Find routes
-curl -s http://localhost:3000/main.js | grep -oE 'path:"[^"]*"'
+curl -s http://localhost:8000/main.js | grep -oE 'path:"[^"]*"'
 ```
 
 ### Findings:
@@ -120,7 +120,7 @@ curl -s http://localhost:3000/main.js | grep -oE 'path:"[^"]*"'
 
 3. **Missing Security Headers:**
    ```bash
-   curl -I http://localhost:3000
+   curl -I http://localhost:8000
    ```
    Missing headers:
    - `Content-Security-Policy`

@@ -1,10 +1,10 @@
-# OWASP Juice Shop - Red Team & Blue Team Exercise Setup
+# OWASP Juice Shop - Purple Team Exercise Setup
 
 ## Overview
 
-This repository contains a complete dockerized environment for conducting Red Team (offensive) and Blue Team (defensive) security exercises using OWASP Juice Shop as the target application.
+This repository contains a complete dockerized environment for conducting **Purple Team** security exercises using OWASP Juice Shop as the target application. Red Team and Blue Team work simultaneously on coordinated exercises.
 
-**Duration:** 2 hours per team (can be run simultaneously for Purple Team exercises)
+**Duration:** 2 hours (3 exercises x 40 minutes)
 
 ## Prerequisites
 
@@ -43,9 +43,9 @@ mkdir -p red-team
 docker-compose up -d
 ```
 
-#### Option B: Red Team Only (Minimal Setup)
+#### Option B: Juice Shop Only (Minimal Setup)
 ```bash
-docker-compose up -d juice-shop kali-attack
+docker-compose up -d juice-shop
 ```
 
 #### Option C: Blue Team Only (With Monitoring)
@@ -62,7 +62,7 @@ Wait 2-3 minutes for all services to start, then verify:
 docker-compose ps
 
 # Test Juice Shop
-curl http://localhost:3000
+curl http://localhost:8000
 
 # Test Kibana (Blue Team)
 curl http://localhost:5601
@@ -75,22 +75,30 @@ curl http://localhost:8080
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Juice Shop | http://localhost:3000 | Vulnerable application (direct) |
+| Juice Shop | http://localhost:8000 | Vulnerable application (direct) |
 | Juice Shop (via Proxy) | http://localhost:8080 | Vulnerable application (logged) |
 | Kibana | http://localhost:5601 | Log analysis & dashboards |
 | Elasticsearch | http://localhost:9200 | Search engine backend |
 
 ## Quick Start Guide
 
-### For Red Team
-1. Access the attack box: `docker exec -it kali-attack /bin/bash`
-2. Target URL: `http://juice-shop:3000` (internal) or `http://localhost:3000` (external)
-3. Navigate to `red-team/exercises/` and start with Exercise 01
+### For Red Team (Attackers)
+1. Use your own Kali Linux or security testing environment
+2. Target URL: `http://<VPS_IP>:8000` (direct) or `http://<VPS_IP>:8080` (proxied/logged)
+3. Navigate to `exercises/` folder
+4. Each exercise has Red Team and Blue Team sections - follow your section
 
-### For Blue Team
-1. Access Kibana: http://localhost:5601
-2. Navigate to `blue-team/exercises/` and start with Exercise 01
-3. Monitor attacks via logs and dashboards
+### For Blue Team (Defenders)
+1. SSH into the VPS or access Kibana: http://<VPS_IP>:5601
+2. Navigate to `exercises/` folder
+3. Each exercise has Red Team and Blue Team sections - follow your section
+4. Monitor logs via command line: `tail -f ./logs/nginx/access.log`
+
+### Exercise Flow
+1. **Both teams read** the same exercise file together
+2. **Red Team** follows the 🔴 Red Team Instructions
+3. **Blue Team** follows the 🔵 Blue Team Instructions
+4. **Debrief together** using the 🟣 Debrief Questions
 
 ## Stopping the Environment
 

@@ -149,8 +149,8 @@ class AttackSimulator:
 
 def main():
     parser = argparse.ArgumentParser(description="Attack Simulator for Blue Team Training")
-    parser.add_argument("--target", default="http://localhost:3000", 
-                        help="Target URL (default: http://localhost:3000)")
+    parser.add_argument("--target", default="http://localhost:8000", 
+                        help="Target URL (default: http://localhost:8000)")
     parser.add_argument("--proxy", default="http://localhost:8080",
                         help="Proxy URL for logged traffic")
     parser.add_argument("--use-proxy", action="store_true",

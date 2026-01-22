@@ -2,15 +2,19 @@
 """
 Juice Shop Attack Scripts
 Red Team Utility Functions
+
+Usage: python attack_toolkit.py [--target http://TARGET_IP:8000]
 """
 
 import requests
 import json
+import argparse
 from colorama import Fore, Style, init
 
 init()
 
-BASE_URL = "http://juice-shop:3000"  # Internal Docker URL
+# Default target - update with your VPS IP
+BASE_URL = "http://localhost:8000"
 
 class JuiceShopAttacker:
     def __init__(self, base_url=BASE_URL):

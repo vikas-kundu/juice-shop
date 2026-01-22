@@ -53,8 +53,8 @@ fi
 # Select mode
 echo ""
 echo "Select training mode:"
-echo "  1) Full Environment (Red Team + Blue Team monitoring)"
-echo "  2) Red Team Only (Juice Shop + Attack Box)"
+echo "  1) Full Environment (Juice Shop + Blue Team monitoring)"
+echo "  2) Juice Shop Only (Minimal Setup)"
 echo "  3) Blue Team Only (Juice Shop + ELK Stack)"
 echo ""
 read -p "Enter selection [1-3]: " MODE
@@ -65,8 +65,8 @@ case $MODE in
         docker compose up -d
         ;;
     2)
-        echo -e "${BLUE}[*] Starting Red Team environment...${NC}"
-        docker compose up -d juice-shop kali-attack
+        echo -e "${BLUE}[*] Starting Juice Shop only...${NC}"
+        docker compose up -d juice-shop
         ;;
     3)
         echo -e "${BLUE}[*] Starting Blue Team environment...${NC}"
@@ -91,8 +91,8 @@ echo ""
 echo -e "${BLUE}[*] Testing endpoints...${NC}"
 
 # Test Juice Shop
-if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200"; then
-    echo -e "${GREEN}[+] Juice Shop: http://localhost:3000 - OK${NC}"
+if curl -s -o /dev/null -w "%{http_code}" http://localhost:8000 | grep -q "200"; then
+    echo -e "${GREEN}[+] Juice Shop: http://localhost:8000 - OK${NC}"
 else
     echo -e "${RED}[-] Juice Shop: Not responding yet (may still be starting)${NC}"
 fi
@@ -122,12 +122,13 @@ echo -e "${GREEN}SETUP COMPLETE!${NC}"
 echo "═══════════════════════════════════════════════════════════"
 echo ""
 echo "ACCESS POINTS:"
-echo "  • Juice Shop:     http://localhost:3000"
+echo "  • Juice Shop:     http://localhost:8000"
 echo "  • Proxied Access: http://localhost:8080 (logged)"
 echo "  • Kibana:         http://localhost:5601"
 echo ""
 echo "RED TEAM:"
-echo "  • Access attack box: docker exec -it kali-attack bash"
+echo "  • Use your own Kali Linux environment"
+echo "  • Target: http://<VPS_IP>:8000"
 echo "  • Exercises: red-team/exercises/"
 echo "  • Answers: red-team/answers/"
 echo ""
