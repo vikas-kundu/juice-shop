@@ -76,11 +76,11 @@ docker-compose ps
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Juice Shop (Direct) | http://localhost:8000 | Direct access (no logging) |
-| **Juice Shop (Proxied)** | http://localhost:8080 | **Use this for exercises** (logged) |
+| **Juice Shop** | http://localhost:8080 | **Main target** (via nginx proxy, logged) |
 | Kibana | http://localhost:5601 | Log analysis dashboard |
+| Blue Team SSH | `ssh blueteam@<IP> -p 2222` | Log access for Blue Team |
 
-> **Important for Exercises:** Red Team should attack port **8080** so Blue Team can see the attacks in logs!
+> **Note:** Juice Shop is only accessible through the nginx proxy on port 8080. All traffic is logged for Blue Team analysis.
 
 ## 🟣 Purple Team Exercises (Main Track)
 
@@ -117,8 +117,7 @@ docker-compose ps
 
 ### Setup
 - Use your own Kali Linux or security testing environment
-- **Target:** `http://<VPS_IP>:8080` (proxied - Blue Team sees your attacks)
-- Alternative: `http://<VPS_IP>:8000` (direct - no logging)
+- **Target:** `http://<VPS_IP>:8080` (all traffic logged for Blue Team)
 
 ### Objectives
 - Exploit vulnerabilities in OWASP Juice Shop

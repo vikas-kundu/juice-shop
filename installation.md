@@ -75,17 +75,18 @@ curl http://localhost:8080
 
 | Service | URL/Command | Purpose |
 |---------|-----|---------|
-| Juice Shop | http://localhost:8000 | Vulnerable application (direct) |
-| Juice Shop (via Proxy) | http://localhost:8080 | Vulnerable application (logged) |
+| **Juice Shop** | http://localhost:8080 | Vulnerable application (via nginx, all traffic logged) |
 | Kibana | http://localhost:5601 | Log analysis & dashboards |
 | Elasticsearch | http://localhost:9200 | Search engine backend |
 | **Blue Team SSH** | `ssh blueteam@localhost -p 2222` | Blue Team log access |
+
+> **Note:** Juice Shop is only accessible through nginx proxy on port 8080. Direct access is disabled.
 
 ## Quick Start Guide
 
 ### For Red Team (Attackers)
 1. Use your own Kali Linux or security testing environment
-2. Target URL: `http://<VPS_IP>:8000` (direct) or `http://<VPS_IP>:8080` (proxied/logged)
+2. Target URL: `http://<VPS_IP>:8080` (all traffic is logged)
 3. Navigate to `exercises/` folder
 4. Each exercise has Red Team and Blue Team sections - follow your section
 

@@ -1,11 +1,12 @@
 
 services:
-  # OWASP Juice Shop - Vulnerable Application
+  # OWASP Juice Shop - Vulnerable Application (internal only - access via nginx on port 8080)
   juice-shop:
     image: bkimminich/juice-shop:latest
     container_name: juice-shop
-    ports:
-      - "8000:3000"
+    # No public ports - only accessible through nginx-proxy
+    expose:
+      - "3000"
     environment:
       - NODE_ENV=development
     networks:
