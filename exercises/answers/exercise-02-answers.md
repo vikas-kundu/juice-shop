@@ -16,7 +16,7 @@
 ```bash
 #!/bin/bash
 # brute_force_complete.sh
-TARGET="http://<VPS_IP>:8000"
+TARGET="http://<VPS_IP>:8080"
 
 # Known users
 USERS=("admin@juice-sh.op" "jim@juice-sh.op" "bender@juice-sh.op")
@@ -62,17 +62,16 @@ hydra -L users.txt -P passwords.txt \
 #### Real-Time Monitoring
 ```bash
 # Watch all login attempts
-tail -f ./logs/nginx/access.log | grep "POST /rest/user/login"
+docker logs -f nginx-proxy 2>&1 | grep "login"
 
 # Count failed logins
-watch -n 5 'grep "POST /rest/user/login" ./logs/nginx/access.log | \
-    grep " 401 " | wc -l'
+docker logs nginx-proxy 2>&1 | grep "login" | grep -c '" 401 '
 ```
 
 #### Find Attacker
 ```bash
 # Most active IPs on login endpoint
-grep "POST /rest/user/login" ./logs/nginx/access.log | \
+docker logs nginx-proxy 2>&1 | grep "login" | \
     awk '{print $1}' | sort | uniq -c | sort -rn | head -5
 ```
 
@@ -90,27 +89,19 @@ message: *login* AND response:200
 ```bash
 #!/bin/bash
 # auto_blocker.sh
-
-LOG="./logs/nginx/access.log"
 MAX_ATTEMPTS=10
-BLOCKED_FILE="/tmp/blocked_ips.txt"
-
-touch $BLOCKED_FILE
 
 while true; do
     echo "=== Scan $(date) ==="
     
     # Find IPs with too many failed logins
-    grep "POST /rest/user/login" "$LOG" | grep " 401 " | \
+    docker logs nginx-proxy 2>&1 | grep "login" | grep '" 401 ' | \
         awk '{print $1}' | sort | uniq -c | \
         while read count ip; do
             if [ "$count" -gt "$MAX_ATTEMPTS" ]; then
-                # Check if already blocked
-                if ! grep -q "$ip" $BLOCKED_FILE; then
-                    echo "⚠️  BLOCKING: $ip ($count failed attempts)"
-                    sudo iptables -A INPUT -s "$ip" -j DROP
-                    echo "$ip" >> $BLOCKED_FILE
-                fi
+                echo "⚠️  ALERT: $ip has $count failed attempts"
+                # Block inside nginx container
+                docker exec nginx-proxy sh -c "echo 'deny $ip;' >> /etc/nginx/blocked.conf" 2>/dev/null
             fi
         done
     

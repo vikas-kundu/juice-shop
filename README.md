@@ -76,11 +76,13 @@ docker-compose ps
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Juice Shop | http://localhost:8000 | Target application |
-| Juice Shop (Proxied) | http://localhost:8080 | Logged traffic |
-| Kibana | http://localhost:5601 | Log analysis |
+| Juice Shop (Direct) | http://localhost:8000 | Direct access (no logging) |
+| **Juice Shop (Proxied)** | http://localhost:8080 | **Use this for exercises** (logged) |
+| Kibana | http://localhost:5601 | Log analysis dashboard |
 
-## � Purple Team Exercises (Main Track)
+> **Important for Exercises:** Red Team should attack port **8080** so Blue Team can see the attacks in logs!
+
+## 🟣 Purple Team Exercises (Main Track)
 
 **Duration:** 2 hours total (3 exercises x 40 minutes each)  
 **Skill Level:** Beginner  
@@ -115,8 +117,8 @@ docker-compose ps
 
 ### Setup
 - Use your own Kali Linux or security testing environment
-- Target: `http://<VPS_IP>:8000`
-- Proxied (logged): `http://<VPS_IP>:8080`
+- **Target:** `http://<VPS_IP>:8080` (proxied - Blue Team sees your attacks)
+- Alternative: `http://<VPS_IP>:8000` (direct - no logging)
 
 ### Objectives
 - Exploit vulnerabilities in OWASP Juice Shop
@@ -132,21 +134,47 @@ docker-compose ps
 
 ## 🔵 Blue Team (Defenders)
 
-### Setup
-- Access Kibana: `http://<VPS_IP>:5601`
-- Monitor logs: `./logs/nginx/access.log`
-- SSH access to the VPS
+### Setup (Docker Logs Only - No Server SSH Required)
+
+Blue Team monitors attacks via Docker logs from any machine with Docker access:
+
+```bash
+# Watch all HTTP traffic in real-time
+docker logs -f nginx-proxy
+
+# Filter for specific attack patterns
+docker logs -f nginx-proxy 2>&1 | grep -iE "(union|select|script|onerror)"
+```
+
+### Log Access Methods
+
+| Method | Command | Description |
+|--------|---------|-------------|
+| **Docker Logs** | `docker logs -f nginx-proxy` | Full HTTP requests with payloads |
+| **Kibana** | Browser to `http://<VPS_IP>:5601` | Visual log analysis dashboard |
+
+### Key Docker Log Commands
+
+```bash
+# Real-time monitoring
+docker logs -f nginx-proxy
+
+# Search historical logs
+docker logs nginx-proxy 2>&1 | grep -i "PATTERN"
+
+# Find attacker IPs
+docker logs nginx-proxy 2>&1 | awk '{print $1}' | sort | uniq -c | sort -rn
+```
 
 ### Objectives
-- Detect attacks in real-time
+- Detect attacks in real-time via Docker logs
 - Identify attacker IPs
-- Implement blocking rules
+- Block attackers using `docker exec` commands
 - Document incidents
 
 ### Tools Provided
 - ELK Stack (Elasticsearch, Kibana, Filebeat)
-- Nginx reverse proxy with logging
-- Python detection scripts
+- Nginx reverse proxy with stdout logging
 
 ## 📊 Covered Vulnerabilities (OWASP Top 10)
 

