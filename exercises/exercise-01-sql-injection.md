@@ -121,32 +121,44 @@ Document in your notes:
 
 **Objective:** Establish baseline and monitoring
 
-#### Log Access via Docker
+#### SSH Access to Blue Team Server
 
-Blue Team monitors attacks using **Docker logs** from their own machine (no server SSH required):
+Blue Team has SSH access to a dedicated monitoring server with access to all logs:
 
 ```bash
-# Watch nginx proxy logs in real-time
-docker logs -f nginx-proxy
-
-# Filter for SQL injection patterns
-docker logs -f nginx-proxy 2>&1 | grep -iE "(union|select|or.1=1|'--)"
+# SSH to Blue Team server (password: defend123)
+ssh blueteam@<VPS_IP> -p 2222
 ```
 
-> **Tip:** Red Team attacks port **8080** (proxied) → visible in `docker logs nginx-proxy`
+> **Credentials:**
+> - **Username:** `blueteam`
+> - **Password:** `defend123`
+> - **Port:** `2222`
 
-#### 1. Open Terminal and Start Watching
+#### 1. Connect and Start Watching
 
 ```bash
+# SSH into Blue Team server
+ssh blueteam@<VPS_IP> -p 2222
+
+# Run the helper script to see available commands
+~/scripts/help.sh
+
 # Real-time log monitoring
-docker logs -f nginx-proxy
+tail -f /var/log/nginx/access.log
 ```
 
 #### 2. In a Second Terminal - Filter for Attacks
 
 ```bash
+# SSH in another terminal
+ssh blueteam@<VPS_IP> -p 2222
+
 # Watch only for SQL injection patterns
-docker logs -f nginx-proxy 2>&1 | grep -iE "(union|select|or.*=|'--|%27)"
+tail -f /var/log/nginx/access.log | grep -iE "(union|select|or.*=|'--|%27)"
+
+# Or use the detection script
+~/scripts/detect-sqli.sh
 ```
 
 #### 3. Access Kibana (Optional)
@@ -163,21 +175,24 @@ http://<VPS_IP>:5601
 
 **Objective:** Detect SQL injection attacks as they happen
 
-#### Detection via Docker Logs
+#### Detection via SSH (on Blue Team Server)
 
 ```bash
 # Get all logs and search for SQL patterns
-docker logs nginx-proxy 2>&1 | grep -iE "(union|select|or.1=1|'--|%27)"
+grep -iE "(union|select|or.1=1|'--|%27)" /var/log/nginx/access.log
 
 # Count SQL injection attempts
-docker logs nginx-proxy 2>&1 | grep -ciE "(union|select|or.1=1)"
+grep -ciE "(union|select|or.1=1)" /var/log/nginx/access.log
 
 # Find attacker IPs (first field in log)
-docker logs nginx-proxy 2>&1 | grep -iE "(union|select|or.1=1)" | \
+grep -iE "(union|select|or.1=1)" /var/log/nginx/access.log | \
     awk '{print $1}' | sort | uniq -c | sort -rn
 
 # Watch for successful attacks (200 status)
-docker logs nginx-proxy 2>&1 | grep -iE "(union|select)" | grep '" 200 '
+grep -iE "(union|select)" /var/log/nginx/access.log | grep '" 200 '
+
+# Or use the built-in detection script
+~/scripts/detect-sqli.sh
 ```
 
 #### Kibana Detection Queries
@@ -205,33 +220,33 @@ message:*UNION* OR message:*SELECT* OR message:*OR*1=1*
 #### 1. Identify Attacker IP
 
 ```bash
-# Find the most active attacker from docker logs
-docker logs nginx-proxy 2>&1 | grep -iE "(union|select|or.1=1)" | \
+# Find the most active attacker from logs
+grep -iE "(union|select|or.1=1)" /var/log/nginx/access.log | \
     awk '{print $1}' | sort | uniq -c | sort -rn | head -5
+
+# Or use the helper script
+~/scripts/show-attackers.sh
 ```
 
-#### 2. Block the IP via Docker
+#### 2. Report the IP for Blocking
 
-**Option A: Block at nginx level (inside container)**
+Blue Team documents the attacker IP and reports to the instructor/admin for blocking.
+
 ```bash
-# Add IP to nginx deny list
-docker exec nginx-proxy sh -c "echo 'deny <ATTACKER_IP>;' >> /etc/nginx/blocked.conf"
+# Record attacker IP for blocking
+ATTACKER_IP=$(grep -iE "(union|select)" /var/log/nginx/access.log | \
+    awk '{print $1}' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
 
-# Create include file if needed and reload
-docker exec nginx-proxy nginx -s reload
+echo "Attacker IP to block: $ATTACKER_IP"
+echo "$ATTACKER_IP" >> ~/blocked_ips.txt
 ```
 
-**Option B: Use iptables on the Docker host**
-```bash
-# This requires someone with server access to run:
-# sudo iptables -A INPUT -s <ATTACKER_IP> -j DROP
-```
+> **Note:** In a real scenario, you would report this to the network team or use a WAF console to block the IP.
 
-#### 3. Verify Block
+#### 3. Verify Attack Stopped
 ```bash
-# Tell Red Team to try again
-# Check if their requests still appear in logs
-docker logs nginx-proxy 2>&1 | tail -5
+# Check if requests from attacker continue
+tail -f /var/log/nginx/access.log | grep "$ATTACKER_IP"
 ```
 
 ---

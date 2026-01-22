@@ -134,47 +134,83 @@ docker-compose ps
 
 ## 🔵 Blue Team (Defenders)
 
-### Setup (Docker Logs Only - No Server SSH Required)
+### Setup (SSH Access to Blue Team Server)
 
-Blue Team monitors attacks via Docker logs from any machine with Docker access:
+Blue Team has SSH access to a dedicated monitoring server with access to all logs:
 
 ```bash
-# Watch all HTTP traffic in real-time
-docker logs -f nginx-proxy
-
-# Filter for specific attack patterns
-docker logs -f nginx-proxy 2>&1 | grep -iE "(union|select|script|onerror)"
+# SSH to Blue Team server
+ssh blueteam@<VPS_IP> -p 2222
+# Password: defend123
 ```
 
-### Log Access Methods
+### SSH Access Credentials
 
-| Method | Command | Description |
-|--------|---------|-------------|
-| **Docker Logs** | `docker logs -f nginx-proxy` | Full HTTP requests with payloads |
-| **Kibana** | Browser to `http://<VPS_IP>:5601` | Visual log analysis dashboard |
+| Field | Value |
+|-------|-------|
+| **Host** | `<VPS_IP>` |
+| **Port** | `2222` |
+| **Username** | `blueteam` |
+| **Password** | `defend123` |
 
-### Key Docker Log Commands
+### Available Helper Scripts
+
+Once connected via SSH, use these commands:
+
+```bash
+# See all available commands
+~/scripts/help.sh
+
+# Real-time log monitoring
+~/scripts/monitor.sh
+
+# Detect SQL injection attempts
+~/scripts/detect-sqli.sh
+
+# Detect brute force attacks
+~/scripts/detect-bruteforce.sh
+
+# Detect XSS attempts
+~/scripts/detect-xss.sh
+
+# Show attacker IPs
+~/scripts/show-attackers.sh
+
+# View latest logs
+~/scripts/tail-logs.sh
+```
+
+### Key Log Analysis Commands
 
 ```bash
 # Real-time monitoring
-docker logs -f nginx-proxy
+tail -f /var/log/nginx/access.log
 
-# Search historical logs
-docker logs nginx-proxy 2>&1 | grep -i "PATTERN"
+# Search for specific patterns
+grep -iE "PATTERN" /var/log/nginx/access.log
 
 # Find attacker IPs
-docker logs nginx-proxy 2>&1 | awk '{print $1}' | sort | uniq -c | sort -rn
+awk '{print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn
 ```
 
+### Additional Access (Optional)
+
+| Method | Access | Description |
+|--------|--------|-------------|
+| **SSH** | `ssh blueteam@<VPS_IP> -p 2222` | Primary log access |
+| **Kibana** | Browser to `http://<VPS_IP>:5601` | Visual log analysis dashboard |
+
 ### Objectives
-- Detect attacks in real-time via Docker logs
+- Detect attacks in real-time via SSH log access
 - Identify attacker IPs
-- Block attackers using `docker exec` commands
-- Document incidents
+- Document and report attackers for blocking
+- Create incident reports
 
 ### Tools Provided
+- SSH server with log access
+- Helper detection scripts
 - ELK Stack (Elasticsearch, Kibana, Filebeat)
-- Nginx reverse proxy with stdout logging
+- Nginx reverse proxy with detailed logging
 
 ## 📊 Covered Vulnerabilities (OWASP Top 10)
 

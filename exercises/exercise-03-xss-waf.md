@@ -213,26 +213,35 @@ done
 
 **Objective:** Detect XSS patterns in traffic
 
-#### Log Access via Docker
+#### SSH Access to Blue Team Server
 
-Blue Team monitors attacks using **Docker logs** (no server SSH required):
+Blue Team has SSH access to a dedicated monitoring server with access to all logs:
 
 ```bash
-# Watch all nginx proxy traffic
-docker logs -f nginx-proxy
-
-# Filter for XSS patterns
-docker logs -f nginx-proxy 2>&1 | grep -iE "(<script|javascript:|onerror=|onload=|<iframe|<svg)"
+# SSH to Blue Team server (password: defend123)
+ssh blueteam@<VPS_IP> -p 2222
 ```
 
-> **Tip:** Red Team attacks port **8080** → visible in `docker logs nginx-proxy`
+> **Credentials:**
+> - **Username:** `blueteam`
+> - **Password:** `defend123`
+> - **Port:** `2222`
 
 #### 1. Start Watching for XSS Patterns
 
 ```bash
+# SSH into Blue Team server
+ssh blueteam@<VPS_IP> -p 2222
+
+# Run helper script to see commands
+~/scripts/help.sh
+
 # Real-time XSS detection
-docker logs -f nginx-proxy 2>&1 | \
+tail -f /var/log/nginx/access.log | \
     grep -iE "(script|javascript|onerror|onload|iframe|svg|img.*=)"
+
+# Or use the detection script
+~/scripts/detect-xss.sh
 ```
 
 #### 2. XSS Detection Script
@@ -243,7 +252,7 @@ docker logs -f nginx-proxy 2>&1 | \
 
 echo "🔍 XSS Detection Active..."
 
-docker logs -f nginx-proxy 2>&1 | while read line; do
+tail -f /var/log/nginx/access.log | while read line; do
     if echo "$line" | grep -qiE "(script|javascript:|onerror|onload|iframe|svg)"; then
         echo "⚠️  XSS DETECTED: $line"
     fi
@@ -280,26 +289,32 @@ message: (*script* OR *javascript* OR *onerror* OR *onload*)
 | `<svg>` | SVG-based XSS |
 | `<img src=x` | Image error XSS |
 
-#### Count XSS Attempts via Docker Logs
+#### Count XSS Attempts via SSH (on Blue Team Server)
 
 ```bash
 # Total XSS attempts
-docker logs nginx-proxy 2>&1 | grep -ciE "(script|javascript:|onerror|onload)"
+grep -ciE "(script|javascript:|onerror|onload)" /var/log/nginx/access.log
 
 # Group by type
 echo "=== XSS Attempts by Type ==="
-echo "Script tags: $(docker logs nginx-proxy 2>&1 | grep -ci 'script')"
-echo "Event handlers: $(docker logs nginx-proxy 2>&1 | grep -ciE '(onerror|onload)')"
-echo "JavaScript protocol: $(docker logs nginx-proxy 2>&1 | grep -ci 'javascript')"
-echo "Iframes: $(docker logs nginx-proxy 2>&1 | grep -ci 'iframe')"
+echo "Script tags: $(grep -ci 'script' /var/log/nginx/access.log)"
+echo "Event handlers: $(grep -ciE '(onerror|onload)' /var/log/nginx/access.log)"
+echo "JavaScript protocol: $(grep -ci 'javascript' /var/log/nginx/access.log)"
+echo "Iframes: $(grep -ci 'iframe' /var/log/nginx/access.log)"
+
+# Or use the detection script
+~/scripts/detect-xss.sh
 ```
 
 #### Find Attacker IPs
 
 ```bash
 # IPs with XSS attempts
-docker logs nginx-proxy 2>&1 | grep -iE "(script|onerror|onload)" | \
+grep -iE "(script|onerror|onload)" /var/log/nginx/access.log | \
     awk '{print $1}' | sort | uniq -c | sort -rn
+
+# Use the helper script
+~/scripts/show-attackers.sh
 ```
 
 ---
@@ -308,23 +323,25 @@ docker logs nginx-proxy 2>&1 | grep -iE "(script|onerror|onload)" | \
 
 **Objective:** Block XSS attacks at the proxy level
 
-#### Block Attacker IP via Docker
+#### Identify and Report Attacker IP
 
 ```bash
 # Find attacker IP
-ATTACKER=$(docker logs nginx-proxy 2>&1 | grep -iE "(script|onerror)" | \
+ATTACKER=$(grep -iE "(script|onerror)" /var/log/nginx/access.log | \
     awk '{print $1}' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
 
-echo "Blocking XSS attacker: $ATTACKER"
+echo "XSS Attacker IP to block: $ATTACKER"
+echo "$ATTACKER" >> ~/blocked_ips.txt
 
-# Block inside nginx container
-docker exec nginx-proxy sh -c "echo 'deny $ATTACKER;' >> /etc/nginx/blocked.conf"
-docker exec nginx-proxy nginx -s reload
+# Use helper script
+~/scripts/show-attackers.sh
 ```
 
-#### WAF-Style Rules (optional - for advanced users)
+> **Note:** In a real scenario, report this IP to the network/security team or WAF console for blocking.
 
-If you have access to update nginx.conf, you can add XSS blocking rules:
+#### WAF-Style Rules (Reference)
+
+For reference - XSS blocking would be configured in nginx.conf:
 
 ```nginx
 location / {
@@ -341,6 +358,7 @@ location / {
     proxy_pass http://juice-shop:3000;
     add_header X-XSS-Protection "1; mode=block";
 }
+```
 ```
 
 ---

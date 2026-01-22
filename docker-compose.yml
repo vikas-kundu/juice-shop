@@ -58,15 +58,34 @@ services:
 
   # Nginx Reverse Proxy with logging
   nginx-proxy:
-    image: nginx:alpine
+    build:
+      context: ./blue-team/nginx
+      dockerfile: Dockerfile
     container_name: nginx-proxy
     ports:
       - "8080:80"
     volumes:
       - ./blue-team/config/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./logs/nginx:/var/log/nginx
+      - nginx-logs:/var/log/nginx
     depends_on:
       - juice-shop
+    networks:
+      - juiceshop-network
+    restart: unless-stopped
+
+  # Blue Team SSH Server for log access
+  blueteam-ssh:
+    build:
+      context: ./blue-team/ssh-server
+      dockerfile: Dockerfile
+    container_name: blueteam-ssh
+    ports:
+      - "2222:22"
+    volumes:
+      - nginx-logs:/var/log/nginx:ro
+      - ./blue-team/ssh-server/scripts:/home/blueteam/scripts:ro
+    depends_on:
+      - nginx-proxy
     networks:
       - juiceshop-network
     restart: unless-stopped
@@ -77,3 +96,4 @@ networks:
 
 volumes:
   elasticsearch-data:
+  nginx-logs:

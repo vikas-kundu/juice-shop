@@ -57,22 +57,36 @@ hydra -L users.txt -P passwords.txt \
 
 ## 🔵 Blue Team Answers
 
-### Detection Commands
+### SSH Access
+
+```bash
+# Connect to Blue Team server
+ssh blueteam@<VPS_IP> -p 2222
+# Password: defend123
+```
+
+### Detection Commands (on Blue Team Server)
 
 #### Real-Time Monitoring
 ```bash
 # Watch all login attempts
-docker logs -f nginx-proxy 2>&1 | grep "login"
+tail -f /var/log/nginx/access.log | grep "login"
 
 # Count failed logins
-docker logs nginx-proxy 2>&1 | grep "login" | grep -c '" 401 '
+grep "login" /var/log/nginx/access.log | grep -c '" 401 '
+
+# Or use helper script
+~/scripts/detect-bruteforce.sh
 ```
 
 #### Find Attacker
 ```bash
 # Most active IPs on login endpoint
-docker logs nginx-proxy 2>&1 | grep "login" | \
+grep "login" /var/log/nginx/access.log | \
     awk '{print $1}' | sort | uniq -c | sort -rn | head -5
+
+# Or use helper script
+~/scripts/show-attackers.sh
 ```
 
 #### Kibana Queries
@@ -84,20 +98,40 @@ message: *login* AND response:401
 message: *login* AND response:200
 ```
 
-### Complete Auto-Blocker Script
+### Document Attacker for Blocking
+
+```bash
+# Find and record attacker IP
+ATTACKER=$(grep "login" /var/log/nginx/access.log | grep '" 401 ' | \
+    awk '{print $1}' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
+
+echo "Attacker IP to report: $ATTACKER"
+echo "$ATTACKER" >> ~/blocked_ips.txt
+```
+
+### Complete Detection Script
 
 ```bash
 #!/bin/bash
-# auto_blocker.sh
-MAX_ATTEMPTS=10
+# brute_force_detector.sh
+THRESHOLD=10
 
 while true; do
-    echo "=== Scan $(date) ==="
+    echo "=== Brute Force Check $(date) ==="
     
-    # Find IPs with too many failed logins
-    docker logs nginx-proxy 2>&1 | grep "login" | grep '" 401 ' | \
-        awk '{print $1}' | sort | uniq -c | \
-        while read count ip; do
+    # Get IPs with failed logins
+    grep "login" /var/log/nginx/access.log | grep '" 401 ' | \
+        awk '{print $1}' | sort | uniq -c | sort -rn | head -5
+    
+    FAILED=$(grep "login" /var/log/nginx/access.log | grep -c '" 401 ')
+    
+    if [ "$FAILED" -gt "$THRESHOLD" ]; then
+        echo "⚠️  ALERT: $FAILED failed login attempts detected!"
+    fi
+    
+    sleep 10
+done
+```
             if [ "$count" -gt "$MAX_ATTEMPTS" ]; then
                 echo "⚠️  ALERT: $ip has $count failed attempts"
                 # Block inside nginx container

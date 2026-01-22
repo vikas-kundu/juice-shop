@@ -42,17 +42,31 @@ curl "http://<VPS_IP>:8080/rest/products/search?q='))UNION+SELECT+id,email,passw
 
 ## 🔵 Blue Team Answers
 
-### Detection Commands
+### SSH Access
+
+```bash
+# Connect to Blue Team server
+ssh blueteam@<VPS_IP> -p 2222
+# Password: defend123
+```
+
+### Detection Commands (on Blue Team Server)
 
 #### Find SQL Injection Attempts
 ```bash
-docker logs nginx-proxy 2>&1 | grep -iE "(union|select|or.1=1|'--|%27)"
+grep -iE "(union|select|or.1=1|'--|%27)" /var/log/nginx/access.log
+
+# Or use helper script
+~/scripts/detect-sqli.sh
 ```
 
 #### Count Attacks Per IP
 ```bash
-docker logs nginx-proxy 2>&1 | grep -iE "(union|select|or.1=1)" | \
+grep -iE "(union|select|or.1=1)" /var/log/nginx/access.log | \
     awk '{print $1}' | sort | uniq -c | sort -rn
+
+# Or use helper script
+~/scripts/show-attackers.sh
 ```
 
 #### Kibana Query
@@ -60,16 +74,15 @@ docker logs nginx-proxy 2>&1 | grep -iE "(union|select|or.1=1)" | \
 message: (*UNION* OR *SELECT* OR *OR*1=1* OR *'--*)
 ```
 
-### Blocking Commands
+### Blocking - Document Attacker IP
 
 ```bash
 # Find attacker IP
-ATTACKER=$(docker logs nginx-proxy 2>&1 | grep -iE "union|select" | \
+ATTACKER=$(grep -iE "union|select" /var/log/nginx/access.log | \
     awk '{print $1}' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
 
-# Block inside nginx container
-docker exec nginx-proxy sh -c "echo 'deny $ATTACKER;' >> /etc/nginx/blocked.conf"
-docker exec nginx-proxy nginx -s reload
+echo "Attacker IP to report: $ATTACKER"
+echo "$ATTACKER" >> ~/blocked_ips.txt
 ```
 
 ### Sample Incident Report

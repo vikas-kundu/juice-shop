@@ -73,12 +73,13 @@ curl http://localhost:8080
 
 ## Service Endpoints
 
-| Service | URL | Purpose |
+| Service | URL/Command | Purpose |
 |---------|-----|---------|
 | Juice Shop | http://localhost:8000 | Vulnerable application (direct) |
 | Juice Shop (via Proxy) | http://localhost:8080 | Vulnerable application (logged) |
 | Kibana | http://localhost:5601 | Log analysis & dashboards |
 | Elasticsearch | http://localhost:9200 | Search engine backend |
+| **Blue Team SSH** | `ssh blueteam@localhost -p 2222` | Blue Team log access |
 
 ## Quick Start Guide
 
@@ -89,10 +90,33 @@ curl http://localhost:8080
 4. Each exercise has Red Team and Blue Team sections - follow your section
 
 ### For Blue Team (Defenders)
-1. SSH into the VPS or access Kibana: http://<VPS_IP>:5601
-2. Navigate to `exercises/` folder
-3. Each exercise has Red Team and Blue Team sections - follow your section
-4. Monitor logs via command line: `tail -f ./logs/nginx/access.log`
+1. SSH into the Blue Team server:
+   ```bash
+   ssh blueteam@<VPS_IP> -p 2222
+   # Password: defend123
+   ```
+2. Run helper scripts to detect attacks:
+   ```bash
+   ~/scripts/help.sh          # See all available commands
+   ~/scripts/detect-sqli.sh   # Detect SQL injection
+   ~/scripts/detect-bruteforce.sh  # Detect brute force
+   ~/scripts/detect-xss.sh    # Detect XSS
+   ~/scripts/show-attackers.sh     # Show attacker IPs
+   ```
+3. Monitor logs in real-time:
+   ```bash
+   tail -f /var/log/nginx/access.log
+   ```
+4. (Optional) Access Kibana: http://<VPS_IP>:5601
+
+### Blue Team SSH Credentials
+
+| Field | Value |
+|-------|-------|
+| Host | `<VPS_IP>` |
+| Port | `2222` |
+| Username | `blueteam` |
+| Password | `defend123` |
 
 ### Exercise Flow
 1. **Both teams read** the same exercise file together

@@ -98,24 +98,37 @@ done
 
 ## 🔵 Blue Team Answers
 
-### Detection Commands
+### SSH Access
+
+```bash
+# Connect to Blue Team server
+ssh blueteam@<VPS_IP> -p 2222
+# Password: defend123
+```
+
+### Detection Commands (on Blue Team Server)
 
 #### Real-Time XSS Detection
 ```bash
-docker logs -f nginx-proxy 2>&1 | \
+tail -f /var/log/nginx/access.log | \
     grep -iE "(script|javascript:|onerror=|onload=|iframe|svg)"
+
+# Or use helper script
+~/scripts/detect-xss.sh
 ```
 
 #### Count XSS Attempts
 ```bash
-docker logs nginx-proxy 2>&1 | \
-    grep -ciE "(script|javascript:|onerror|onload|iframe|svg)"
+grep -ciE "(script|javascript:|onerror|onload|iframe|svg)" /var/log/nginx/access.log
 ```
 
 #### Find Attacker IPs
 ```bash
-docker logs nginx-proxy 2>&1 | grep -iE "(script|onerror)" | \
+grep -iE "(script|onerror)" /var/log/nginx/access.log | \
     awk '{print $1}' | sort | uniq -c | sort -rn
+
+# Or use helper script
+~/scripts/show-attackers.sh
 ```
 
 ### Simple XSS Detection Script
@@ -126,31 +139,28 @@ docker logs nginx-proxy 2>&1 | grep -iE "(script|onerror)" | \
 
 echo "🔍 XSS Detection Active..."
 
-docker logs -f nginx-proxy 2>&1 | while read line; do
+tail -f /var/log/nginx/access.log | while read line; do
     if echo "$line" | grep -qiE "(script|javascript:|onerror|onload|iframe|svg)"; then
         echo "⚠️  XSS DETECTED: $line"
     fi
 done
 ```
 
-### Blocking Attacker via Docker
+### Document Attacker for Blocking
 
 ```bash
 # Find attacker IP
-ATTACKER=$(docker logs nginx-proxy 2>&1 | grep -iE "(script|onerror)" | \
+ATTACKER=$(grep -iE "(script|onerror)" /var/log/nginx/access.log | \
     awk '{print $1}' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
 
-echo "Blocking XSS attacker: $ATTACKER"
-
-# Block inside nginx container
-docker exec nginx-proxy sh -c "echo 'deny $ATTACKER;' >> /etc/nginx/blocked.conf"
-docker exec nginx-proxy nginx -s reload
+echo "XSS Attacker IP to report: $ATTACKER"
+echo "$ATTACKER" >> ~/blocked_ips.txt
 ```
 
-### WAF Rules for Nginx (Optional Advanced)
+### WAF Rules for Nginx (Reference)
 
 ```nginx
-# XSS blocking rules (add to nginx.conf if you have server access)
+# XSS blocking rules (would be added to nginx.conf by admin)
 location / {
     # Block script tags
     if ($request_uri ~* "(script|javascript:)") {

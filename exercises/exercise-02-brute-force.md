@@ -216,33 +216,44 @@ curl -s -X POST "http://<VPS_IP>:8080/rest/user/login" \
 
 **Objective:** Monitor login attempts
 
-#### Log Access via Docker
+#### SSH Access to Blue Team Server
 
-Blue Team monitors attacks using **Docker logs** (no server SSH required):
+Blue Team has SSH access to a dedicated monitoring server with access to all logs:
 
 ```bash
-# Watch all nginx proxy traffic
-docker logs -f nginx-proxy
-
-# Filter for login attempts only
-docker logs -f nginx-proxy 2>&1 | grep -i "/rest/user/login"
+# SSH to Blue Team server (password: defend123)
+ssh blueteam@<VPS_IP> -p 2222
 ```
 
-> **Tip:** Red Team attacks port **8080** → visible in `docker logs nginx-proxy`
+> **Credentials:**
+> - **Username:** `blueteam`
+> - **Password:** `defend123`
+> - **Port:** `2222`
 
 #### 1. Start Watching Login Attempts
 
 ```bash
+# SSH into Blue Team server
+ssh blueteam@<VPS_IP> -p 2222
+
+# Run helper script to see commands
+~/scripts/help.sh
+
 # Real-time login monitoring
-docker logs -f nginx-proxy 2>&1 | grep -i "login"
+tail -f /var/log/nginx/access.log | grep -i "login"
+
+# Or use the detection script
+~/scripts/detect-bruteforce.sh
 ```
 
 #### 2. Count Failed Logins
 
 In another terminal:
 ```bash
+ssh blueteam@<VPS_IP> -p 2222
+
 # Count failed logins (401 responses)
-docker logs nginx-proxy 2>&1 | grep "login" | grep '" 401 ' | wc -l
+grep "login" /var/log/nginx/access.log | grep '" 401 ' | wc -l
 ```
 
 #### 3. (Optional) Kibana
@@ -260,18 +271,21 @@ message: *login* AND NOT response:200
 
 **Objective:** Identify the attack in progress
 
-#### Detection via Docker Logs
+#### Detection via SSH (on Blue Team Server)
 
 ```bash
 # Find IPs with failed logins
-docker logs nginx-proxy 2>&1 | grep "login" | grep '" 401 ' | \
+grep "login" /var/log/nginx/access.log | grep '" 401 ' | \
     awk '{print $1}' | sort | uniq -c | sort -rn | head -5
 
 # Count total failed attempts
-docker logs nginx-proxy 2>&1 | grep "login" | grep -c '" 401 '
+grep "login" /var/log/nginx/access.log | grep -c '" 401 '
 
 # Watch for successful logins after failures (compromise indicator)
-docker logs nginx-proxy 2>&1 | grep "login" | grep '" 200 '
+grep "login" /var/log/nginx/access.log | grep '" 200 '
+
+# Or use the detection script
+~/scripts/detect-bruteforce.sh
 ```
 
 #### Simple Detection Script
@@ -285,11 +299,11 @@ while true; do
     echo "=== Brute Force Check $(date) ==="
     
     # Get IPs with failed logins
-    docker logs nginx-proxy 2>&1 | grep "login" | grep '" 401 ' | \
+    grep "login" /var/log/nginx/access.log | grep '" 401 ' | \
         awk '{print $1}' | sort | uniq -c | sort -rn | head -5
     
     # Alert if threshold exceeded
-    FAILED=$(docker logs nginx-proxy 2>&1 | grep "login" | grep -c '" 401 ')
+    FAILED=$(grep "login" /var/log/nginx/access.log | grep -c '" 401 ')
     
     if [ "$FAILED" -gt "$THRESHOLD" ]; then
         echo "⚠️  ALERT: $FAILED failed login attempts detected!"
@@ -315,23 +329,25 @@ done
 
 **Objective:** Block the brute force attack
 
-#### Option 1: Block Attacker IP via Docker
+#### Option 1: Identify and Report Attacker IP
 
 ```bash
-# Find attacker IP from docker logs
-ATTACKER=$(docker logs nginx-proxy 2>&1 | grep "login" | \
+# Find attacker IP from logs
+ATTACKER=$(grep "login" /var/log/nginx/access.log | \
     awk '{print $1}' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
 
-echo "Blocking IP: $ATTACKER"
+echo "Attacker IP to block: $ATTACKER"
+echo "$ATTACKER" >> ~/blocked_ips.txt
 
-# Block inside nginx container
-docker exec nginx-proxy sh -c "echo 'deny $ATTACKER;' >> /etc/nginx/blocked.conf"
-docker exec nginx-proxy nginx -s reload
+# Use the helper script
+~/scripts/show-attackers.sh
 ```
 
-#### Option 2: Rate Limit Configuration
+> **Note:** In a real scenario, report this IP to the network/security team for blocking.
 
-Create rate limiting (requires server access to update nginx.conf):
+#### Option 2: Rate Limit Configuration (Reference)
+
+For reference - rate limiting would be configured in nginx.conf:
 ```nginx
 # Add to nginx.conf
 limit_req_zone $binary_remote_addr zone=login:10m rate=5r/s;
