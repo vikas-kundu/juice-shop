@@ -1,7 +1,7 @@
 FROM alpine:latest
 
 # Install OpenSSH and bash
-RUN apk add --no-cache openssh bash grep gawk coreutils
+RUN apk add --no-cache openssh bash grep gawk coreutils shadow
 
 # Configure SSH
 RUN ssh-keygen -A && \
